@@ -51,6 +51,9 @@ public interface Model {
     int registraProdotto(String nome, String descrizione,
                          double prezzo, String categoria);
 
+    /** Crea una piadina componibile con prezzo calcolato. */
+    Prodotto creaPiadinaComponibile(String descrizione, double prezzo);
+
     // ---------- Ordini ----------
 
     /**
@@ -70,8 +73,20 @@ public interface Model {
     /** Registra il feedback su un servizio. */
     void lasciaFeedback(int idServizio, int voto, String commento);
 
+    /** Lista feedback per admin. */
+    List<DettaglioFeedback> getFeedback();
+
+    /** Lista prodotti in magazzino. */
+    List<Magazzino> getMagazzino();
+
+    /** Aggiorna manualmente la quantita in magazzino. */
+    void aggiornaMagazzino(int idProdotto, int quantita);
+
     /** Storico ordini dell'utente. */
     List<Servizio> getStoricoOrdini(int idUtente);
+
+    /** Tessera fedelta dell'utente. */
+    TesseraFedelta getTesseraFedelta(int idUtente);
 
     /** Ordini delivery visibili al fattorino. */
     List<Servizio> getOrdiniDelivery();

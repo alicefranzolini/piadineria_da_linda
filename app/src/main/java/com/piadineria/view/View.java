@@ -50,6 +50,11 @@ public final class View {
     private DefaultListModel<StatisticaProdotto> modelStats;
     private JList<StatisticaProdotto> listaAdminStats;
     private DefaultListModel<StatisticaProdotto> modelAdminStats;
+    private JList<DettaglioFeedback> listaFeedback;
+    private DefaultListModel<DettaglioFeedback> modelFeedback;
+    private JLabel labelMediaFeedback;
+    private JList<Magazzino> listaMagazzino;
+    private DefaultListModel<Magazzino> modelMagazzino;
     private JList<Servizio> listaPrenotazioniTavoli;
     private DefaultListModel<Servizio> modelPrenotazioniTavoli;
     private JList<Servizio> listaDelivery;
@@ -175,6 +180,15 @@ public final class View {
             "Dettagli ordine", JOptionPane.INFORMATION_MESSAGE);
     }
 
+    public void mostraTesseraFedelta(TesseraFedelta tessera) {
+        var area = new JTextArea(tessera.testo(), 9, 38);
+        area.setEditable(false);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        JOptionPane.showMessageDialog(frame, new JScrollPane(area),
+            "Tessera fedelta", JOptionPane.INFORMATION_MESSAGE);
+    }
+
     public void pulisciFormFattorino() {
         campoNomeFattorino.setText("");
         campoCognomeFattorino.setText("");
@@ -197,6 +211,18 @@ public final class View {
     public void mostraPrenotazioniTavoli(List<Servizio> prenotazioni) {
         modelPrenotazioniTavoli.clear();
         prenotazioni.forEach(modelPrenotazioniTavoli::addElement);
+    }
+
+    public void mostraFeedback(List<DettaglioFeedback> feedback) {
+        modelFeedback.clear();
+        feedback.forEach(modelFeedback::addElement);
+        double media = feedback.stream().mapToInt(f -> f.voto).average().orElse(0);
+        labelMediaFeedback.setText(String.format("Gradimento medio: %.0f%%", media / 5.0 * 100.0));
+    }
+
+    public void mostraMagazzino(List<Magazzino> righe) {
+        modelMagazzino.clear();
+        righe.forEach(modelMagazzino::addElement);
     }
 
     public void mostraErrore(String messaggio) {
@@ -356,9 +382,12 @@ public final class View {
         headerDestra.setOpaque(false);
         labelCarrello = new JLabel("🛒 Carrello: 0 prodotti");
         labelCarrello.setForeground(Color.WHITE);
+        var btnTessera = new JButton("Tessera fedelta");
+        btnTessera.setForeground(COLORE_PRIMARIO);
         var btnLogout = new JButton("Esci");
         btnLogout.setForeground(COLORE_PRIMARIO);
         headerDestra.add(labelCarrello);
+        headerDestra.add(btnTessera);
         headerDestra.add(btnLogout);
         header.add(headerDestra, BorderLayout.EAST);
         panel.add(header, BorderLayout.NORTH);
@@ -457,6 +486,7 @@ public final class View {
 
         // --- AZIONI ---
         btnLogout.addActionListener(e -> controller.logout());
+        btnTessera.addActionListener(e -> controller.mostraTesseraFedelta());
 
         filtroCibo.addActionListener(e -> {
             filtroProdotti = "CIBO";
@@ -470,6 +500,10 @@ public final class View {
         btnAggiungi.addActionListener(e -> {
             var sel = listaProdotti.getSelectedValue();
             if (sel == null) { mostraErrore("Seleziona un prodotto dal menù."); return; }
+            if ("Piadina componibile".equalsIgnoreCase(sel.nome)) {
+                mostraDialogPiadinaComponibile();
+                return;
+            }
             controller.aggiungiAlCarrello(sel);
         });
 
@@ -610,15 +644,19 @@ public final class View {
         var corpo = new JPanel(new BorderLayout(10, 10));
         corpo.setOpaque(false);
 
-        var menuAdmin = new JPanel(new GridLayout(1, 4, 10, 0));
+        var menuAdmin = new JPanel(new GridLayout(1, 6, 10, 0));
         menuAdmin.setOpaque(false);
         var btnGestioneFattorini = creaBottone("Gestione fattorini");
         var btnStatisticheAdmin = creaBottone("Statistiche");
         var btnGestioneTavoli = creaBottone("Gestione tavoli");
+        var btnFeedbackAdmin = creaBottone("Feedback");
+        var btnMagazzino = creaBottone("Magazzino");
         var btnModificaMenu = creaBottone("Modifica menu");
         menuAdmin.add(btnGestioneFattorini);
         menuAdmin.add(btnStatisticheAdmin);
         menuAdmin.add(btnGestioneTavoli);
+        menuAdmin.add(btnFeedbackAdmin);
+        menuAdmin.add(btnMagazzino);
         menuAdmin.add(btnModificaMenu);
         corpo.add(menuAdmin, BorderLayout.NORTH);
 
@@ -716,9 +754,39 @@ public final class View {
         gbcProdotto.gridx = 0; gbcProdotto.gridy = 4; gbcProdotto.gridwidth = 2;
         panelProdotto.add(btnCreaProdotto, gbcProdotto);
 
+        var panelFeedback = new JPanel(new BorderLayout(5, 5));
+        panelFeedback.setOpaque(false);
+        panelFeedback.setBorder(BorderFactory.createTitledBorder("Feedback clienti"));
+        modelFeedback = new DefaultListModel<>();
+        listaFeedback = new JList<>(modelFeedback);
+        panelFeedback.add(new JScrollPane(listaFeedback), BorderLayout.CENTER);
+        var footerFeedback = new JPanel(new BorderLayout());
+        footerFeedback.setOpaque(false);
+        labelMediaFeedback = new JLabel("Gradimento medio: 0%");
+        var btnAggiornaFeedback = creaBottone("Aggiorna feedback");
+        footerFeedback.add(labelMediaFeedback, BorderLayout.WEST);
+        footerFeedback.add(btnAggiornaFeedback, BorderLayout.EAST);
+        panelFeedback.add(footerFeedback, BorderLayout.SOUTH);
+
+        var panelMagazzino = new JPanel(new BorderLayout(5, 5));
+        panelMagazzino.setOpaque(false);
+        panelMagazzino.setBorder(BorderFactory.createTitledBorder("Magazzino prodotti"));
+        modelMagazzino = new DefaultListModel<>();
+        listaMagazzino = new JList<>(modelMagazzino);
+        panelMagazzino.add(new JScrollPane(listaMagazzino), BorderLayout.CENTER);
+        var footerMagazzino = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+        footerMagazzino.setOpaque(false);
+        var btnAggiornaMagazzino = creaBottone("Aggiorna");
+        var btnModificaQuantita = creaBottone("Modifica quantita");
+        footerMagazzino.add(btnAggiornaMagazzino);
+        footerMagazzino.add(btnModificaQuantita);
+        panelMagazzino.add(footerMagazzino, BorderLayout.SOUTH);
+
         adminCards.add(panelFattorini, "FATTORINI");
         adminCards.add(panelStats, "STATISTICHE");
         adminCards.add(panelTavoli, "TAVOLI");
+        adminCards.add(panelFeedback, "FEEDBACK");
+        adminCards.add(panelMagazzino, "MAGAZZINO");
         adminCards.add(panelProdotto, "MENU");
         corpo.add(adminCards, BorderLayout.CENTER);
         panel.add(corpo, BorderLayout.CENTER);
@@ -736,6 +804,14 @@ public final class View {
             adminCardLayout.show(adminCards, "TAVOLI");
             controller.caricaPrenotazioniTavoli();
         });
+        btnFeedbackAdmin.addActionListener(e -> {
+            adminCardLayout.show(adminCards, "FEEDBACK");
+            controller.caricaFeedbackAdmin();
+        });
+        btnMagazzino.addActionListener(e -> {
+            adminCardLayout.show(adminCards, "MAGAZZINO");
+            controller.caricaMagazzino();
+        });
         btnModificaMenu.addActionListener(e -> adminCardLayout.show(adminCards, "MENU"));
         btnAggiorna.addActionListener(e -> controller.caricaAdmin());
         btnCreaFattorino.addActionListener(e -> controller.registraFattorino(
@@ -752,6 +828,19 @@ public final class View {
             controller.confermaPrenotazioneTavolo(listaPrenotazioniTavoli.getSelectedValue()));
         btnRifiutaTavolo.addActionListener(e ->
             controller.rifiutaPrenotazioneTavolo(listaPrenotazioniTavoli.getSelectedValue()));
+        btnAggiornaFeedback.addActionListener(e -> controller.caricaFeedbackAdmin());
+        btnAggiornaMagazzino.addActionListener(e -> controller.caricaMagazzino());
+        btnModificaQuantita.addActionListener(e -> {
+            var selezionata = listaMagazzino.getSelectedValue();
+            if (selezionata == null) {
+                mostraErrore("Seleziona un prodotto dal magazzino.");
+                return;
+            }
+            var valore = JOptionPane.showInputDialog(frame,
+                "Nuova quantita per " + selezionata.nomeProdotto + ":",
+                selezionata.quantita);
+            if (valore != null) controller.aggiornaMagazzino(selezionata, valore);
+        });
         btnCreaProdotto.addActionListener(e -> controller.registraProdotto(
             campoNomeProdotto.getText(),
             campoDescrizioneProdotto.getText(),
@@ -821,6 +910,54 @@ public final class View {
         }
     }
 
+    private void mostraDialogPiadinaComponibile() {
+        String[] carni = {"Salsiccia", "Prosciutto crudo", "Prosciutto cotto", "Salame", "Speck", "Pollo", "Tonno"};
+        String[] extra = {"Squacquerone", "Mozzarella", "Fontina", "Brie", "Rucola", "Pomodoro", "Verdure grigliate", "Funghi", "Cipolla", "Maionese", "Salsa yogurt"};
+
+        var panel = new JPanel(new GridLayout(1, 2, 10, 0));
+        var panelCarni = new JPanel(new GridLayout(0, 1));
+        panelCarni.setBorder(BorderFactory.createTitledBorder("Carni (+1 euro)"));
+        var panelExtra = new JPanel(new GridLayout(0, 1));
+        panelExtra.setBorder(BorderFactory.createTitledBorder("Formaggi, verdure, salse (+0.50 euro)"));
+
+        var checksCarni = new ArrayList<JCheckBox>();
+        for (var ingrediente : carni) {
+            var check = new JCheckBox(ingrediente);
+            checksCarni.add(check);
+            panelCarni.add(check);
+        }
+
+        var checksExtra = new ArrayList<JCheckBox>();
+        for (var ingrediente : extra) {
+            var check = new JCheckBox(ingrediente);
+            checksExtra.add(check);
+            panelExtra.add(check);
+        }
+
+        panel.add(panelCarni);
+        panel.add(panelExtra);
+
+        int risposta = JOptionPane.showConfirmDialog(frame, panel,
+            "Componi la tua piadina", JOptionPane.OK_CANCEL_OPTION);
+        if (risposta != JOptionPane.OK_OPTION) return;
+
+        var ingredienti = new ArrayList<String>();
+        double prezzo = 5.00;
+        for (var check : checksCarni) {
+            if (check.isSelected()) {
+                ingredienti.add(check.getText());
+                prezzo += 1.00;
+            }
+        }
+        for (var check : checksExtra) {
+            if (check.isSelected()) {
+                ingredienti.add(check.getText());
+                prezzo += 0.50;
+            }
+        }
+        controller.aggiungiPiadinaComponibile(ingredienti, prezzo);
+    }
+
     private void filtraProdotti() {
         modelProdotti.clear();
         prodottiDisponibili.stream()
@@ -881,6 +1018,10 @@ public final class View {
                 setBackground(list.getSelectionBackground());
                 titolo.setForeground(list.getSelectionForeground());
                 descrizione.setForeground(list.getSelectionForeground());
+            } else if ("Piadina componibile".equalsIgnoreCase(prodotto.nome)) {
+                setBackground(new Color(255, 235, 205));
+                titolo.setForeground(COLORE_PRIMARIO);
+                descrizione.setForeground(new Color(90, 55, 25));
             } else {
                 setBackground(list.getBackground());
                 titolo.setForeground(list.getForeground());

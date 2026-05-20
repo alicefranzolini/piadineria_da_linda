@@ -209,6 +209,19 @@ public final class Controller {
         view.mostraMessaggio("\"" + prodotto.nome + "\" aggiunto al carrello.");
     }
 
+    /** Crea e aggiunge al carrello una piadina componibile. */
+    public void aggiungiPiadinaComponibile(List<String> ingredienti,
+                                           double prezzo) {
+        if (ingredienti.isEmpty()) {
+            view.mostraErrore("Seleziona almeno un ingrediente.");
+            return;
+        }
+        var descrizione = "Ingredienti: " + String.join(", ", ingredienti);
+        var prodotto = model.creaPiadinaComponibile(descrizione, prezzo);
+        aggiungiAlCarrello(prodotto);
+        caricaProdotti();
+    }
+
     /** Svuota il carrello. */
     public void svuotaCarrello() {
         carrello.clear();
@@ -344,6 +357,20 @@ public final class Controller {
         view.mostraStorico(storico);
     }
 
+    /** Mostra la tessera fedelta dell'utente corrente. */
+    public void mostraTesseraFedelta() {
+        if (utenteCorrente == null) {
+            view.mostraErrore("Non sei loggato.");
+            return;
+        }
+
+        try {
+            view.mostraTesseraFedelta(model.getTesseraFedelta(utenteCorrente.id));
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante il caricamento della tessera fedelta: " + dettaglioErrore(e));
+        }
+    }
+
     /** Carica gli ordini delivery per il fattorino. */
     public void caricaOrdiniDelivery() {
         var ordini = model.getOrdiniDelivery();
@@ -451,6 +478,45 @@ public final class Controller {
     /** Rifiuta la prenotazione tavolo selezionata. */
     public void rifiutaPrenotazioneTavolo(Servizio prenotazione) {
         aggiornaPrenotazioneTavolo(prenotazione, "rifiutata");
+    }
+
+    /** Carica i feedback per l'admin. */
+    public void caricaFeedbackAdmin() {
+        try {
+            view.mostraFeedback(model.getFeedback());
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante il caricamento dei feedback: " + dettaglioErrore(e));
+        }
+    }
+
+    /** Carica il magazzino per l'admin. */
+    public void caricaMagazzino() {
+        try {
+            view.mostraMagazzino(model.getMagazzino());
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante il caricamento del magazzino: " + dettaglioErrore(e));
+        }
+    }
+
+    /** Aggiorna manualmente una quantita di magazzino. */
+    public void aggiornaMagazzino(Magazzino riga, String quantitaTesto) {
+        if (riga == null) {
+            view.mostraErrore("Seleziona un prodotto dal magazzino.");
+            return;
+        }
+        try {
+            int quantita = Integer.parseInt(quantitaTesto.trim());
+            if (quantita < 0) {
+                view.mostraErrore("La quantita non puo essere negativa.");
+                return;
+            }
+            model.aggiornaMagazzino(riga.idProdotto, quantita);
+            caricaMagazzino();
+        } catch (NumberFormatException e) {
+            view.mostraErrore("Inserisci una quantita valida.");
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante l'aggiornamento del magazzino: " + dettaglioErrore(e));
+        }
     }
 
     private void aggiornaPrenotazioneTavolo(Servizio prenotazione, String stato) {

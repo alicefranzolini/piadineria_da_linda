@@ -48,7 +48,9 @@ public final class Prodotto {
                 FROM   PRODOTTO p
                 JOIN   CATEGORIA_PRODOTTO c ON p.id_categoria = c.id_categoria
                 WHERE  p.disponibilita = TRUE
-                ORDER BY c.nome_categoria, p.nome
+                ORDER BY
+                    CASE WHEN LOWER(p.nome) = 'piadina componibile' THEN 0 ELSE 1 END,
+                    c.nome_categoria, p.nome
                 """;
 
         private static final String FIND_CATEGORY = """
@@ -73,6 +75,12 @@ public final class Prodotto {
                 INSERT INTO PRODOTTO
                     (nome, descrizione, costo_prodotto, disponibilita, id_categoria)
                 VALUES (?, ?, ?, TRUE, ?)
+                """;
+
+        private static final String INSERT_CUSTOM_PRODUCT = """
+                INSERT INTO PRODOTTO
+                    (nome, descrizione, costo_prodotto, disponibilita, id_categoria)
+                VALUES (?, ?, ?, FALSE, ?)
                 """;
 
         /**
@@ -129,6 +137,28 @@ public final class Prodotto {
             }
         }
 
+        public static Prodotto creaComponibile(Connection connection,
+                                               String descrizione,
+                                               double prezzo) {
+            try {
+                int idCategoria = getOrCreateCategoria(connection, "Cibo");
+                String nomeDb = "Piadina componibile personalizzata " + System.nanoTime();
+                var stmt = connection.prepareStatement(
+                    INSERT_CUSTOM_PRODUCT, java.sql.Statement.RETURN_GENERATED_KEYS);
+                stmt.setString(1, nomeDb);
+                stmt.setString(2, descrizione);
+                stmt.setDouble(3, prezzo);
+                stmt.setInt(4, idCategoria);
+                stmt.executeUpdate();
+
+                var keys = stmt.getGeneratedKeys();
+                if (!keys.next()) throw new DAOException("Creazione piadina componibile fallita");
+                return new Prodotto(keys.getInt(1), "Piadina componibile", descrizione, prezzo, "Cibo", true);
+            } catch (SQLException e) {
+                throw new DAOException(e);
+            }
+        }
+
         private static void seedMenu(Connection connection) {
             try {
                 int cibo = getOrCreateCategoria(connection, "Cibo");
@@ -158,6 +188,8 @@ public final class Prodotto {
                     "Mozzarella, pomodoro, basilico e origano", 6.40, cibo);
                 inserisciSeManca(connection, "Piadina Nutella",
                     "Piadina dolce con Nutella", 4.50, cibo);
+                inserisciSeManca(connection, "Piadina componibile",
+                    "Base piadina 5 euro, ingredienti a scelta", 5.00, cibo);
                 inserisciSeManca(connection, "Rotolo Kebab",
                     "Carne kebab, insalata, pomodoro e salsa yogurt", 7.90, cibo);
                 inserisciSeManca(connection, "Crescione Erbe",

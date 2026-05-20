@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Date;
 import java.sql.Time;
+import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -297,6 +298,7 @@ public final class Servizio {
                         s.executeUpdate();
                     }
                 }
+                Magazzino.DAO.decrementa(connection, prodotti);
 
                 // 4. Registra la transizione di stato iniziale
                 inserisciTransizioneIniziale(connection, idServizio, idStatoInAttesa);
@@ -347,6 +349,14 @@ public final class Servizio {
                         connection, INSERT_FEEDBACK, voto, commento, idServizio)) {
                     s.executeUpdate();
                 }
+            } catch (SQLException e) {
+                throw new DAOException(e);
+            }
+        }
+
+        public static void preparaFeedbackCompatibile(Connection connection) {
+            try {
+                preparaFeedback(connection);
             } catch (SQLException e) {
                 throw new DAOException(e);
             }
@@ -475,6 +485,13 @@ public final class Servizio {
                 "dat_ora", "TIME");
             rendiNullableSeEsiste(connection, "FEEDBACK",
                 "dat_ora_inizio", "TIME");
+            rendiNullableSeEsiste(connection, "FEEDBACK",
+                "dat_ora_fine", "TIME");
+            rendiNullableSeEsiste(connection, "FEEDBACK",
+                "data_feedback", "DATE");
+            rendiNullableSeEsiste(connection, "FEEDBACK",
+                "giorno_feedback", "DATE");
+            rendiNullableColonneLegacyFeedback(connection);
         }
 
         private static int getOrCreateStato(Connection connection, String nomeStato)
@@ -534,6 +551,48 @@ public final class Servizio {
                     connection.getCatalog(), null, tabella.toLowerCase(), colonna)) {
                 return columns.next();
             }
+        }
+
+        private static void rendiNullableColonneLegacyFeedback(Connection connection)
+                throws SQLException {
+            var metaData = connection.getMetaData();
+            try (var columns = metaData.getColumns(
+                    connection.getCatalog(), null, "FEEDBACK", null)) {
+                while (columns.next()) {
+                    String colonna = columns.getString("COLUMN_NAME");
+                    String nome = colonna.toLowerCase();
+                    boolean colonnaUsataDalCodice = nome.equals("id_feedback")
+                        || nome.equals("id_servizio")
+                        || nome.equals("voto")
+                        || nome.equals("commento");
+                    boolean autoIncrement = "YES".equalsIgnoreCase(
+                        columns.getString("IS_AUTOINCREMENT"));
+                    boolean nullable = "YES".equalsIgnoreCase(
+                        columns.getString("IS_NULLABLE"));
+
+                    if (colonnaUsataDalCodice || autoIncrement || nullable) continue;
+
+                    String definizione = definizioneColonna(columns);
+                    try (var stmt = connection.createStatement()) {
+                        stmt.executeUpdate("ALTER TABLE FEEDBACK MODIFY COLUMN "
+                            + colonna + " " + definizione + " NULL");
+                    }
+                }
+            }
+        }
+
+        private static String definizioneColonna(java.sql.ResultSet columns)
+                throws SQLException {
+            int dataType = columns.getInt("DATA_TYPE");
+            String typeName = columns.getString("TYPE_NAME");
+            int size = columns.getInt("COLUMN_SIZE");
+            int decimals = columns.getInt("DECIMAL_DIGITS");
+
+            return switch (dataType) {
+                case Types.CHAR, Types.VARCHAR -> typeName + "(" + size + ")";
+                case Types.DECIMAL, Types.NUMERIC -> typeName + "(" + size + "," + decimals + ")";
+                default -> typeName;
+            };
         }
     }
 }

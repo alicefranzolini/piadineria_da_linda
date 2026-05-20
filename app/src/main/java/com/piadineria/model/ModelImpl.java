@@ -68,6 +68,11 @@ public final class ModelImpl implements Model {
     }
 
     @Override
+    public Prodotto creaPiadinaComponibile(String descrizione, double prezzo) {
+        return Prodotto.DAO.creaComponibile(connection, descrizione, prezzo);
+    }
+
+    @Override
     public int creaOrdine(int idUtente, String tipo,
                           String indirizzo, Map<Integer, Integer> prodotti) {
         return Servizio.DAO.creaOrdine(connection, idUtente, tipo, indirizzo, prodotti);
@@ -85,8 +90,28 @@ public final class ModelImpl implements Model {
     }
 
     @Override
+    public List<DettaglioFeedback> getFeedback() {
+        return DettaglioFeedback.DAO.lista(connection);
+    }
+
+    @Override
+    public List<Magazzino> getMagazzino() {
+        return Magazzino.DAO.lista(connection);
+    }
+
+    @Override
+    public void aggiornaMagazzino(int idProdotto, int quantita) {
+        Magazzino.DAO.aggiorna(connection, idProdotto, quantita);
+    }
+
+    @Override
     public List<Servizio> getStoricoOrdini(int idUtente) {
         return Servizio.DAO.storicoUtente(connection, idUtente);
+    }
+
+    @Override
+    public TesseraFedelta getTesseraFedelta(int idUtente) {
+        return TesseraFedelta.DAO.trovaOCrea(connection, idUtente);
     }
 
     @Override
