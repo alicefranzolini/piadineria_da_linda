@@ -506,8 +506,22 @@ public final class View {
         header.add(btnLogout, BorderLayout.EAST);
         panel.add(header, BorderLayout.NORTH);
 
-        var contenuto = new JPanel(new GridLayout(1, 4, 10, 0));
-        contenuto.setOpaque(false);
+        var corpo = new JPanel(new BorderLayout(10, 10));
+        corpo.setOpaque(false);
+
+        var menuAdmin = new JPanel(new GridLayout(1, 3, 10, 0));
+        menuAdmin.setOpaque(false);
+        var btnGestioneFattorini = creaBottone("Gestione fattorini");
+        var btnStatisticheAdmin = creaBottone("Statistiche");
+        var btnModificaMenu = creaBottone("Modifica menu");
+        menuAdmin.add(btnGestioneFattorini);
+        menuAdmin.add(btnStatisticheAdmin);
+        menuAdmin.add(btnModificaMenu);
+        corpo.add(menuAdmin, BorderLayout.NORTH);
+
+        var adminCards = new JPanel(new CardLayout());
+        adminCards.setOpaque(false);
+        var adminCardLayout = (CardLayout) adminCards.getLayout();
 
         modelAdminStats = new DefaultListModel<>();
         listaAdminStats = new JList<>(modelAdminStats);
@@ -516,29 +530,36 @@ public final class View {
         panelStats.setOpaque(false);
         panelStats.add(new JLabel("Statistiche di vendita"), BorderLayout.NORTH);
         panelStats.add(new JScrollPane(listaAdminStats), BorderLayout.CENTER);
-        contenuto.add(panelStats);
+        var footerStats = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footerStats.setOpaque(false);
+        var btnAggiorna = creaBottone("Aggiorna statistiche");
+        footerStats.add(btnAggiorna);
+        panelStats.add(footerStats, BorderLayout.SOUTH);
 
-        var panelFattorino = new JPanel(new GridBagLayout());
-        panelFattorino.setOpaque(false);
-        panelFattorino.setBorder(BorderFactory.createTitledBorder("Nuovo fattorino"));
+        var panelFattorini = new JPanel(new GridLayout(1, 2, 10, 0));
+        panelFattorini.setOpaque(false);
+
+        var panelNuovoFattorino = new JPanel(new GridBagLayout());
+        panelNuovoFattorino.setOpaque(false);
+        panelNuovoFattorino.setBorder(BorderFactory.createTitledBorder("Nuovo fattorino"));
         var gbc = new GridBagConstraints();
         gbc.insets = new Insets(6, 8, 6, 8);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        campoNomeFattorino = new JTextField(20);
-        campoCognomeFattorino = new JTextField(20);
-        campoEmailFattorino = new JTextField(20);
-        campoPasswordFattorino = new JPasswordField(20);
+        campoNomeFattorino = new JTextField(24);
+        campoCognomeFattorino = new JTextField(24);
+        campoEmailFattorino = new JTextField(24);
+        campoPasswordFattorino = new JPasswordField(24);
 
-        aggiungiCampo(panelFattorino, gbc, 0, "Nome:", campoNomeFattorino);
-        aggiungiCampo(panelFattorino, gbc, 1, "Cognome:", campoCognomeFattorino);
-        aggiungiCampo(panelFattorino, gbc, 2, "Email:", campoEmailFattorino);
-        aggiungiCampo(panelFattorino, gbc, 3, "Password:", campoPasswordFattorino);
+        aggiungiCampo(panelNuovoFattorino, gbc, 0, "Nome:", campoNomeFattorino);
+        aggiungiCampo(panelNuovoFattorino, gbc, 1, "Cognome:", campoCognomeFattorino);
+        aggiungiCampo(panelNuovoFattorino, gbc, 2, "Email:", campoEmailFattorino);
+        aggiungiCampo(panelNuovoFattorino, gbc, 3, "Password:", campoPasswordFattorino);
 
         var btnCreaFattorino = creaBottone("Crea fattorino");
         gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
-        panelFattorino.add(btnCreaFattorino, gbc);
-        contenuto.add(panelFattorino);
+        panelNuovoFattorino.add(btnCreaFattorino, gbc);
+        panelFattorini.add(panelNuovoFattorino);
 
         var panelListaFattorini = new JPanel(new BorderLayout(5, 5));
         panelListaFattorini.setOpaque(false);
@@ -553,18 +574,18 @@ public final class View {
         azioniFattorini.add(btnListaFattorini);
         azioniFattorini.add(btnEliminaFattorino);
         panelListaFattorini.add(azioniFattorini, BorderLayout.SOUTH);
-        contenuto.add(panelListaFattorini);
+        panelFattorini.add(panelListaFattorini);
 
         var panelProdotto = new JPanel(new GridBagLayout());
         panelProdotto.setOpaque(false);
         panelProdotto.setBorder(BorderFactory.createTitledBorder("Nuovo prodotto"));
         var gbcProdotto = new GridBagConstraints();
-        gbcProdotto.insets = new Insets(6, 8, 6, 8);
+        gbcProdotto.insets = new Insets(8, 8, 8, 8);
         gbcProdotto.fill = GridBagConstraints.HORIZONTAL;
 
-        campoNomeProdotto = new JTextField(20);
-        campoDescrizioneProdotto = new JTextField(20);
-        campoPrezzoProdotto = new JTextField(20);
+        campoNomeProdotto = new JTextField(30);
+        campoDescrizioneProdotto = new JTextField(30);
+        campoPrezzoProdotto = new JTextField(30);
         comboCategoriaProdotto = new JComboBox<>(new String[] {"Cibo", "Bevande"});
 
         aggiungiCampo(panelProdotto, gbcProdotto, 0, "Nome:", campoNomeProdotto);
@@ -575,17 +596,23 @@ public final class View {
         var btnCreaProdotto = creaBottone("Crea prodotto");
         gbcProdotto.gridx = 0; gbcProdotto.gridy = 4; gbcProdotto.gridwidth = 2;
         panelProdotto.add(btnCreaProdotto, gbcProdotto);
-        contenuto.add(panelProdotto);
 
-        panel.add(contenuto, BorderLayout.CENTER);
-
-        var footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        footer.setOpaque(false);
-        var btnAggiorna = creaBottone("Aggiorna statistiche");
-        footer.add(btnAggiorna);
-        panel.add(footer, BorderLayout.SOUTH);
+        adminCards.add(panelFattorini, "FATTORINI");
+        adminCards.add(panelStats, "STATISTICHE");
+        adminCards.add(panelProdotto, "MENU");
+        corpo.add(adminCards, BorderLayout.CENTER);
+        panel.add(corpo, BorderLayout.CENTER);
 
         btnLogout.addActionListener(e -> controller.logout());
+        btnGestioneFattorini.addActionListener(e -> {
+            adminCardLayout.show(adminCards, "FATTORINI");
+            controller.caricaFattorini();
+        });
+        btnStatisticheAdmin.addActionListener(e -> {
+            adminCardLayout.show(adminCards, "STATISTICHE");
+            controller.caricaAdmin();
+        });
+        btnModificaMenu.addActionListener(e -> adminCardLayout.show(adminCards, "MENU"));
         btnAggiorna.addActionListener(e -> controller.caricaAdmin());
         btnCreaFattorino.addActionListener(e -> controller.registraFattorino(
             campoNomeFattorino.getText(),
@@ -603,6 +630,7 @@ public final class View {
             (String) comboCategoriaProdotto.getSelectedItem()
         ));
 
+        adminCardLayout.show(adminCards, "FATTORINI");
         return panel;
     }
 
