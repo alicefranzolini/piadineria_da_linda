@@ -54,6 +54,8 @@ public final class View {
     private JTextField campoCognomeFattorino;
     private JTextField campoEmailFattorino;
     private JPasswordField campoPasswordFattorino;
+    private JList<Fattorino> listaFattorini;
+    private DefaultListModel<Fattorino> modelFattorini;
     private JTextField campoNomeProdotto;
     private JTextField campoDescrizioneProdotto;
     private JTextField campoPrezzoProdotto;
@@ -150,6 +152,11 @@ public final class View {
         campoDescrizioneProdotto.setText("");
         campoPrezzoProdotto.setText("");
         comboCategoriaProdotto.setSelectedItem("Cibo");
+    }
+
+    public void mostraFattorini(List<Fattorino> fattorini) {
+        modelFattorini.clear();
+        fattorini.forEach(modelFattorini::addElement);
     }
 
     public void mostraErrore(String messaggio) {
@@ -499,7 +506,7 @@ public final class View {
         header.add(btnLogout, BorderLayout.EAST);
         panel.add(header, BorderLayout.NORTH);
 
-        var contenuto = new JPanel(new GridLayout(1, 3, 10, 0));
+        var contenuto = new JPanel(new GridLayout(1, 4, 10, 0));
         contenuto.setOpaque(false);
 
         modelAdminStats = new DefaultListModel<>();
@@ -532,6 +539,21 @@ public final class View {
         gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
         panelFattorino.add(btnCreaFattorino, gbc);
         contenuto.add(panelFattorino);
+
+        var panelListaFattorini = new JPanel(new BorderLayout(5, 5));
+        panelListaFattorini.setOpaque(false);
+        panelListaFattorini.setBorder(BorderFactory.createTitledBorder("Lista fattorini"));
+        modelFattorini = new DefaultListModel<>();
+        listaFattorini = new JList<>(modelFattorini);
+        panelListaFattorini.add(new JScrollPane(listaFattorini), BorderLayout.CENTER);
+        var azioniFattorini = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+        azioniFattorini.setOpaque(false);
+        var btnListaFattorini = creaBottone("Lista fattorini");
+        var btnEliminaFattorino = new JButton("Elimina");
+        azioniFattorini.add(btnListaFattorini);
+        azioniFattorini.add(btnEliminaFattorino);
+        panelListaFattorini.add(azioniFattorini, BorderLayout.SOUTH);
+        contenuto.add(panelListaFattorini);
 
         var panelProdotto = new JPanel(new GridBagLayout());
         panelProdotto.setOpaque(false);
@@ -571,6 +593,9 @@ public final class View {
             campoEmailFattorino.getText(),
             new String(campoPasswordFattorino.getPassword())
         ));
+        btnListaFattorini.addActionListener(e -> controller.caricaFattorini());
+        btnEliminaFattorino.addActionListener(e ->
+            controller.eliminaFattorino(listaFattorini.getSelectedValue()));
         btnCreaProdotto.addActionListener(e -> controller.registraProdotto(
             campoNomeProdotto.getText(),
             campoDescrizioneProdotto.getText(),

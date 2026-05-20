@@ -31,6 +31,15 @@ public interface Model {
     /** Registra un nuovo fattorino. Restituisce l'id creato. */
     int registraFattorino(String nome, String cognome, String email, String password);
 
+    /** Prepara le strutture dati dei fattorini. */
+    void preparaFattorini();
+
+    /** Lista tutti i fattorini registrati. */
+    List<Fattorino> getFattorini();
+
+    /** Elimina un fattorino. */
+    void eliminaFattorino(int idFattorino);
+
     // ---------- Menù ----------
 
     /** Lista tutti i prodotti disponibili (per la schermata principale). */

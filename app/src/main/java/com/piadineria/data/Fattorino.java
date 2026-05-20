@@ -2,6 +2,8 @@ package com.piadineria.data;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -23,6 +25,11 @@ public final class Fattorino {
 
     public String nomeCompleto() {
         return nome + " " + cognome;
+    }
+
+    @Override
+    public String toString() {
+        return nome + " " + cognome + " (" + email + ")";
     }
 
     public static final class DAO {
@@ -50,6 +57,27 @@ public final class Fattorino {
                 INSERT INTO FATTORINO (nome, cognome, email, password)
                 VALUES (?, ?, ?, ?)
                 """;
+
+        private static final String COUNT_EMAIL_QUERY = """
+                SELECT COUNT(*)
+                FROM   FATTORINO
+                WHERE  LOWER(email) = LOWER(?)
+                """;
+
+        private static final String LIST_QUERY = """
+                SELECT id_fattorino, nome, cognome, email
+                FROM   FATTORINO
+                ORDER BY cognome, nome, email
+                """;
+
+        private static final String DELETE_QUERY = """
+                DELETE FROM FATTORINO
+                WHERE id_fattorino = ?
+                """;
+
+        public static void preparaTabella(Connection connection) {
+            creaTabellaSeServe(connection);
+        }
 
         public static Optional<Fattorino> login(Connection connection,
                                                 String email,
@@ -80,6 +108,10 @@ public final class Fattorino {
                                    String password) {
             creaTabellaSeServe(connection);
             try {
+                if (emailEsiste(connection, email)) {
+                    throw new DAOException("Email fattorino gia registrata");
+                }
+
                 var stmt = connection.prepareStatement(
                     REGISTER_QUERY,
                     java.sql.Statement.RETURN_GENERATED_KEYS
@@ -98,11 +130,101 @@ public final class Fattorino {
             }
         }
 
+        public static List<Fattorino> lista(Connection connection) {
+            creaTabellaSeServe(connection);
+            var fattorini = new ArrayList<Fattorino>();
+            try (
+                var stmt = DAOUtils.prepareStatement(connection, LIST_QUERY);
+                var rs = stmt.executeQuery()
+            ) {
+                while (rs.next()) {
+                    fattorini.add(new Fattorino(
+                        rs.getInt("id_fattorino"),
+                        rs.getString("nome"),
+                        rs.getString("cognome"),
+                        rs.getString("email")
+                    ));
+                }
+            } catch (SQLException e) {
+                throw new DAOException(e);
+            }
+            return fattorini;
+        }
+
+        public static void elimina(Connection connection, int idFattorino) {
+            creaTabellaSeServe(connection);
+            try (var stmt = DAOUtils.prepareStatement(connection, DELETE_QUERY, idFattorino)) {
+                stmt.executeUpdate();
+            } catch (SQLException e) {
+                throw new DAOException(e);
+            }
+        }
+
         private static void creaTabellaSeServe(Connection connection) {
             try (var stmt = connection.createStatement()) {
                 stmt.executeUpdate(CREATE_TABLE);
+                aggiungiColonnaSeManca(connection, "nome",
+                    "VARCHAR(64) NOT NULL DEFAULT ''");
+                aggiungiColonnaSeManca(connection, "cognome",
+                    "VARCHAR(64) NOT NULL DEFAULT ''");
+                aggiungiColonnaSeManca(connection, "email",
+                    "VARCHAR(128) NOT NULL DEFAULT ''");
+                aggiungiColonnaSeManca(connection, "password",
+                    "VARCHAR(128) NOT NULL DEFAULT ''");
+                rendiNullableSeEsiste(connection, "CF", "VARCHAR(16)");
             } catch (SQLException e) {
                 throw new DAOException(e);
+            }
+        }
+
+        private static boolean emailEsiste(Connection connection, String email)
+                throws SQLException {
+            try (var stmt = DAOUtils.prepareStatement(connection, COUNT_EMAIL_QUERY, email);
+                 var rs = stmt.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
+            }
+        }
+
+        private static void aggiungiColonnaSeManca(Connection connection,
+                                                  String colonna,
+                                                  String definizione)
+                throws SQLException {
+            var metaData = connection.getMetaData();
+            try (var columns = metaData.getColumns(
+                    connection.getCatalog(), null, "FATTORINO", colonna)) {
+                if (columns.next()) return;
+            }
+            try (var columns = metaData.getColumns(
+                    connection.getCatalog(), null, "fattorino", colonna)) {
+                if (columns.next()) return;
+            }
+            try (var stmt = connection.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE FATTORINO ADD COLUMN "
+                    + colonna + " " + definizione);
+            }
+        }
+
+        private static void rendiNullableSeEsiste(Connection connection,
+                                                  String colonna,
+                                                  String definizione)
+                throws SQLException {
+            if (!colonnaEsiste(connection, colonna)) return;
+            try (var stmt = connection.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE FATTORINO MODIFY COLUMN "
+                    + colonna + " " + definizione + " NULL");
+            }
+        }
+
+        private static boolean colonnaEsiste(Connection connection, String colonna)
+                throws SQLException {
+            var metaData = connection.getMetaData();
+            try (var columns = metaData.getColumns(
+                    connection.getCatalog(), null, "FATTORINO", colonna)) {
+                if (columns.next()) return true;
+            }
+            try (var columns = metaData.getColumns(
+                    connection.getCatalog(), null, "fattorino", colonna)) {
+                return columns.next();
             }
         }
     }

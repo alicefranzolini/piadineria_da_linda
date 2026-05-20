@@ -88,8 +88,13 @@ public final class Controller {
     }
 
     private void loginFattorino(String email, String password) {
+        email = email.trim().toLowerCase();
         if (email.isBlank() || password.isBlank()) {
             view.mostraErrore("Inserisci email e password del fattorino.");
+            return;
+        }
+        if (!emailValida(email)) {
+            view.mostraErrore("Inserisci un'email fattorino valida.");
             return;
         }
         var risultato = model.loginFattorino(email, password);
@@ -121,16 +126,25 @@ public final class Controller {
 
     /** Registra un fattorino. Questa azione viene esposta solo nell'area admin. */
     public void registraFattorino(String nome, String cognome, String email, String password) {
+        nome = nome.trim();
+        cognome = cognome.trim();
+        email = email.trim().toLowerCase();
+
         if (nome.isBlank() || cognome.isBlank() || email.isBlank() || password.isBlank()) {
             view.mostraErrore("Compila tutti i campi del fattorino.");
+            return;
+        }
+        if (!emailValida(email)) {
+            view.mostraErrore("Inserisci un'email valida, per esempio fattorino@linda.it.");
             return;
         }
         try {
             model.registraFattorino(nome, cognome, email, password);
             view.mostraMessaggio("Fattorino registrato. Ora puo accedere con email e password.");
             view.pulisciFormFattorino();
+            caricaFattorini();
         } catch (DAOException e) {
-            view.mostraErrore("Email fattorino gia registrata o errore nel database.");
+            view.mostraErrore("Impossibile registrare il fattorino: " + dettaglioErrore(e));
         }
     }
 
@@ -264,8 +278,49 @@ public final class Controller {
 
     /** Carica la dashboard amministratore. */
     public void caricaAdmin() {
-        var stats = model.getStatistiche();
-        view.mostraAdmin(stats);
+        try {
+            model.preparaFattorini();
+            var stats = model.getStatistiche();
+            view.mostraAdmin(stats);
+            caricaFattorini();
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante l'apertura dell'area admin: " + dettaglioErrore(e));
+        }
+    }
+
+    /** Mostra la lista dei fattorini registrati. */
+    public void caricaFattorini() {
+        try {
+            view.mostraFattorini(model.getFattorini());
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante il caricamento dei fattorini: " + dettaglioErrore(e));
+        }
+    }
+
+    /** Elimina il fattorino selezionato dall'admin. */
+    public void eliminaFattorino(Fattorino fattorino) {
+        if (fattorino == null) {
+            view.mostraErrore("Seleziona un fattorino dalla lista.");
+            return;
+        }
+        try {
+            model.eliminaFattorino(fattorino.id);
+            view.mostraMessaggio("Fattorino eliminato.");
+            caricaFattorini();
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante l'eliminazione del fattorino: " + dettaglioErrore(e));
+        }
+    }
+
+    private boolean emailValida(String email) {
+        return email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    }
+
+    private String dettaglioErrore(DAOException e) {
+        var cause = e.getCause();
+        if (cause != null && cause.getMessage() != null) return cause.getMessage();
+        if (e.getMessage() != null) return e.getMessage();
+        return "errore sconosciuto";
     }
 
     /** Torna indietro dalla schermata statistiche in base al ruolo corrente. */

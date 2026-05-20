@@ -40,6 +40,21 @@ public final class ModelImpl implements Model {
     }
 
     @Override
+    public void preparaFattorini() {
+        Fattorino.DAO.preparaTabella(connection);
+    }
+
+    @Override
+    public List<Fattorino> getFattorini() {
+        return Fattorino.DAO.lista(connection);
+    }
+
+    @Override
+    public void eliminaFattorino(int idFattorino) {
+        Fattorino.DAO.elimina(connection, idFattorino);
+    }
+
+    @Override
     public List<Prodotto> getProdottiDisponibili() {
         return Prodotto.DAO.listDisponibili(connection);
     }
