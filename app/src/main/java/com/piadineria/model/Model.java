@@ -1,6 +1,8 @@
 package com.piadineria.model;
 
 import com.piadineria.data.*;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -61,6 +63,12 @@ public interface Model {
      */
     int creaOrdine(int idUtente, String tipo, String indirizzo,
                    Map<Integer, Integer> prodotti);
+
+    /** Crea una prenotazione tavolo. */
+    int prenotaTavolo(int idUtente, LocalDate giorno, LocalTime ora, int persone);
+
+    /** Registra il feedback su un servizio. */
+    void lasciaFeedback(int idServizio, int voto, String commento);
 
     /** Storico ordini dell'utente. */
     List<Servizio> getStoricoOrdini(int idUtente);

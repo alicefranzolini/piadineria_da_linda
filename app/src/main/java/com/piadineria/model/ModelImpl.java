@@ -2,6 +2,8 @@ package com.piadineria.model;
 
 import com.piadineria.data.*;
 import java.sql.Connection;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.*;
 
 /**
@@ -69,6 +71,17 @@ public final class ModelImpl implements Model {
     public int creaOrdine(int idUtente, String tipo,
                           String indirizzo, Map<Integer, Integer> prodotti) {
         return Servizio.DAO.creaOrdine(connection, idUtente, tipo, indirizzo, prodotti);
+    }
+
+    @Override
+    public int prenotaTavolo(int idUtente, LocalDate giorno,
+                             LocalTime ora, int persone) {
+        return Servizio.DAO.prenotaTavolo(connection, idUtente, giorno, ora, persone);
+    }
+
+    @Override
+    public void lasciaFeedback(int idServizio, int voto, String commento) {
+        Servizio.DAO.lasciaFeedback(connection, idServizio, voto, commento);
     }
 
     @Override

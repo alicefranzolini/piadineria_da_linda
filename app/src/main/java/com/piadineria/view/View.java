@@ -41,6 +41,9 @@ public final class View {
     private final List<Prodotto> prodottiDisponibili = new ArrayList<>();
     private String filtroProdotti = "CIBO";
     private JLabel         labelCarrello;
+    private JList<RigaCarrello> listaCarrello;
+    private DefaultListModel<RigaCarrello> modelCarrello;
+    private JLabel labelTotaleCarrello;
     private JList<Servizio> listaStorico;
     private DefaultListModel<Servizio> modelStorico;
     private JList<StatisticaProdotto> listaStats;
@@ -116,6 +119,27 @@ public final class View {
 
     public void aggiornaCarrello(int numeroProdotti) {
         labelCarrello.setText("🛒 Carrello: " + numeroProdotti + " prodotti");
+    }
+
+    public void mostraCarrello(Map<Integer, Integer> carrello,
+                               Map<Integer, Prodotto> prodotti) {
+        modelCarrello.clear();
+        double totale = 0;
+
+        for (var entry : carrello.entrySet()) {
+            var prodotto = prodotti.get(entry.getKey());
+            if (prodotto == null) continue;
+            int quantita = entry.getValue();
+            double subtotale = prodotto.prezzo * quantita;
+            totale += subtotale;
+            modelCarrello.addElement(new RigaCarrello(
+                prodotto.id,
+                String.format("%dx %s - %.2f euro",
+                    quantita, prodotto.nome, subtotale)
+            ));
+        }
+
+        labelTotaleCarrello.setText(String.format("Totale: %.2f euro", totale));
     }
 
     public void mostraStatistiche(List<StatisticaProdotto> stats) {
@@ -324,7 +348,7 @@ public final class View {
         panel.add(header, BorderLayout.NORTH);
 
         // --- CENTRO: menù a sinistra, storico a destra ---
-        var centro = new JPanel(new GridLayout(1, 2, 10, 0));
+        var centro = new JPanel(new GridLayout(1, 3, 10, 0));
         centro.setOpaque(false);
 
         // Lista prodotti
@@ -368,6 +392,35 @@ public final class View {
         panelBottoni.add(btnSvuota);
         panelProdotti.add(panelBottoni, BorderLayout.SOUTH);
         centro.add(panelProdotti);
+
+        modelCarrello = new DefaultListModel<>();
+        listaCarrello = new JList<>(modelCarrello);
+        var panelCarrello = new JPanel(new BorderLayout(5, 5));
+        panelCarrello.setOpaque(false);
+        panelCarrello.add(new JLabel("Il tuo carrello"), BorderLayout.NORTH);
+        panelCarrello.add(new JScrollPane(listaCarrello), BorderLayout.CENTER);
+        labelTotaleCarrello = new JLabel("Totale: 0.00 euro");
+        labelTotaleCarrello.setFont(labelTotaleCarrello.getFont().deriveFont(Font.BOLD));
+        var panelAzioniCarrello = new JPanel(new BorderLayout(5, 5));
+        panelAzioniCarrello.setOpaque(false);
+        panelAzioniCarrello.add(labelTotaleCarrello, BorderLayout.NORTH);
+        var bottoniCarrello = new JPanel(new GridLayout(2, 2, 5, 5));
+        bottoniCarrello.setOpaque(false);
+        var btnPrenotaTavolo = creaBottone("Prenota tavolo");
+        var btnFeedback = creaBottone("Feedback");
+        bottoniCarrello.add(btnDelivery);
+        bottoniCarrello.add(btnAsporto);
+        bottoniCarrello.add(btnPrenotaTavolo);
+        bottoniCarrello.add(btnFeedback);
+        panelAzioniCarrello.add(bottoniCarrello, BorderLayout.CENTER);
+        var gestioneCarrello = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+        gestioneCarrello.setOpaque(false);
+        var btnRimuoviCarrello = new JButton("Elimina selezionato");
+        gestioneCarrello.add(btnSvuota);
+        gestioneCarrello.add(btnRimuoviCarrello);
+        panelAzioniCarrello.add(gestioneCarrello, BorderLayout.SOUTH);
+        panelCarrello.add(panelAzioniCarrello, BorderLayout.SOUTH);
+        centro.add(panelCarrello);
 
         // Storico ordini
         modelStorico = new DefaultListModel<>();
@@ -418,7 +471,19 @@ public final class View {
                 controller.confermaOrdineAsporto();
         });
 
+        btnPrenotaTavolo.addActionListener(e -> mostraDialogPrenotazioneTavolo());
+
+        btnFeedback.addActionListener(e -> mostraDialogFeedback());
+
         btnSvuota.addActionListener(e -> controller.svuotaCarrello());
+        btnRimuoviCarrello.addActionListener(e -> {
+            var selezionata = listaCarrello.getSelectedValue();
+            if (selezionata == null) {
+                mostraErrore("Seleziona un prodotto dal carrello.");
+                return;
+            }
+            controller.rimuoviDalCarrello(selezionata.idProdotto);
+        });
 
         btnStatistiche.addActionListener(e -> controller.caricaStatistiche());
 
@@ -642,6 +707,56 @@ public final class View {
         panel.add(campo, gbc);
     }
 
+    private void mostraDialogPrenotazioneTavolo() {
+        var panel = new JPanel(new GridLayout(3, 2, 8, 8));
+        var campoGiorno = new JTextField("2026-05-20");
+        var campoOra = new JTextField("20:30");
+        var campoPersone = new JTextField("2");
+        panel.add(new JLabel("Data (AAAA-MM-GG):"));
+        panel.add(campoGiorno);
+        panel.add(new JLabel("Ora (HH:MM):"));
+        panel.add(campoOra);
+        panel.add(new JLabel("Persone:"));
+        panel.add(campoPersone);
+
+        int risposta = JOptionPane.showConfirmDialog(frame, panel,
+            "Prenota tavolo", JOptionPane.OK_CANCEL_OPTION);
+        if (risposta == JOptionPane.OK_OPTION) {
+            controller.prenotaTavolo(
+                campoGiorno.getText(),
+                campoOra.getText(),
+                campoPersone.getText()
+            );
+        }
+    }
+
+    private void mostraDialogFeedback() {
+        var servizio = listaStorico.getSelectedValue();
+        if (servizio == null) {
+            mostraErrore("Seleziona un ordine dallo storico.");
+            return;
+        }
+
+        var panel = new JPanel(new BorderLayout(8, 8));
+        var voto = new JSpinner(new SpinnerNumberModel(5, 1, 5, 1));
+        var rigaVoto = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        rigaVoto.add(new JLabel("Voto:"));
+        rigaVoto.add(voto);
+        var commento = new JTextArea(4, 25);
+        panel.add(rigaVoto, BorderLayout.NORTH);
+        panel.add(new JScrollPane(commento), BorderLayout.CENTER);
+
+        int risposta = JOptionPane.showConfirmDialog(frame, panel,
+            "Feedback ordine #" + servizio.id, JOptionPane.OK_CANCEL_OPTION);
+        if (risposta == JOptionPane.OK_OPTION) {
+            controller.lasciaFeedback(
+                servizio,
+                (Integer) voto.getValue(),
+                commento.getText()
+            );
+        }
+    }
+
     private void filtraProdotti() {
         modelProdotti.clear();
         prodottiDisponibili.stream()
@@ -662,6 +777,13 @@ public final class View {
             || nome.contains("sprite")
             || nome.contains("birra")
             || nome.contains("te ");
+    }
+
+    private record RigaCarrello(int idProdotto, String testo) {
+        @Override
+        public String toString() {
+            return testo;
+        }
     }
 
     private final class ProdottoCellRenderer extends JPanel

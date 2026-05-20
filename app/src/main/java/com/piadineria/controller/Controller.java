@@ -4,6 +4,9 @@ import com.piadineria.data.*;
 import com.piadineria.model.Model;
 import com.piadineria.view.View;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 /**
@@ -32,6 +35,7 @@ public final class Controller {
 
     // Carrello corrente: id_prodotto -> quantita
     private final Map<Integer, Integer> carrello = new LinkedHashMap<>();
+    private final Map<Integer, Prodotto> prodottiCarrello = new LinkedHashMap<>();
 
     public Controller(Model model, View view) {
         this.model = model;
@@ -84,6 +88,7 @@ public final class Controller {
         utenteCorrente = null;
         fattorinoCorrente = null;
         carrello.clear();
+        prodottiCarrello.clear();
         caricaAdmin();
     }
 
@@ -105,6 +110,7 @@ public final class Controller {
         utenteCorrente = null;
         fattorinoCorrente = risultato.get();
         carrello.clear();
+        prodottiCarrello.clear();
         view.mostraFattorino(fattorinoCorrente.nomeCompleto());
         caricaOrdiniDelivery();
     }
@@ -177,6 +183,7 @@ public final class Controller {
         utenteCorrente = null;
         fattorinoCorrente = null;
         carrello.clear();
+        prodottiCarrello.clear();
         view.mostraLogin();
     }
 
@@ -196,14 +203,36 @@ public final class Controller {
      */
     public void aggiungiAlCarrello(Prodotto prodotto) {
         carrello.merge(prodotto.id, 1, Integer::sum);
+        prodottiCarrello.put(prodotto.id, prodotto);
         view.aggiornaCarrello(carrello.size());
+        view.mostraCarrello(carrello, prodottiCarrello);
         view.mostraMessaggio("\"" + prodotto.nome + "\" aggiunto al carrello.");
     }
 
     /** Svuota il carrello. */
     public void svuotaCarrello() {
         carrello.clear();
+        prodottiCarrello.clear();
         view.aggiornaCarrello(0);
+        view.mostraCarrello(carrello, prodottiCarrello);
+    }
+
+    /** Rimuove una singola unita del prodotto selezionato dal carrello. */
+    public void rimuoviDalCarrello(int idProdotto) {
+        if (!carrello.containsKey(idProdotto)) {
+            view.mostraErrore("Prodotto non presente nel carrello.");
+            return;
+        }
+
+        int nuovaQuantita = carrello.get(idProdotto) - 1;
+        if (nuovaQuantita <= 0) {
+            carrello.remove(idProdotto);
+            prodottiCarrello.remove(idProdotto);
+        } else {
+            carrello.put(idProdotto, nuovaQuantita);
+        }
+        view.aggiornaCarrello(carrello.size());
+        view.mostraCarrello(carrello, prodottiCarrello);
     }
 
     // -------------------------------------------------------------------------
@@ -222,7 +251,9 @@ public final class Controller {
         try {
             int id = model.creaOrdine(utenteCorrente.id, "DELIVERY", indirizzo, carrello);
             carrello.clear();
+            prodottiCarrello.clear();
             view.aggiornaCarrello(0);
+            view.mostraCarrello(carrello, prodottiCarrello);
             view.mostraMessaggio("Ordine #" + id + " confermato! La piadina è in preparazione.");
             caricaStorico();
         } catch (DAOException e) {
@@ -241,11 +272,64 @@ public final class Controller {
         try {
             int id = model.creaOrdine(utenteCorrente.id, "ASPORTO", null, carrello);
             carrello.clear();
+            prodottiCarrello.clear();
             view.aggiornaCarrello(0);
+            view.mostraCarrello(carrello, prodottiCarrello);
             view.mostraMessaggio("Ordine #" + id + " confermato! Ritira tra 20 minuti.");
             caricaStorico();
         } catch (DAOException e) {
             view.mostraErrore("Errore durante la creazione dell'ordine.");
+        }
+    }
+
+    /** Prenota un tavolo per l'utente corrente. */
+    public void prenotaTavolo(String giornoTesto, String oraTesto, String personeTesto) {
+        if (utenteCorrente == null) {
+            view.mostraErrore("Non sei loggato.");
+            return;
+        }
+
+        try {
+            var giorno = LocalDate.parse(giornoTesto.trim());
+            var ora = LocalTime.parse(oraTesto.trim());
+            int persone = Integer.parseInt(personeTesto.trim());
+            if (persone <= 0) {
+                view.mostraErrore("Il numero di persone deve essere maggiore di zero.");
+                return;
+            }
+
+            int id = model.prenotaTavolo(utenteCorrente.id, giorno, ora, persone);
+            view.mostraMessaggio("Prenotazione tavolo #" + id + " confermata.");
+            caricaStorico();
+        } catch (DateTimeParseException e) {
+            view.mostraErrore("Usa data AAAA-MM-GG e ora HH:MM, per esempio 2026-05-20 e 20:30.");
+        } catch (NumberFormatException e) {
+            view.mostraErrore("Inserisci un numero valido di persone.");
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante la prenotazione del tavolo: " + dettaglioErrore(e));
+        }
+    }
+
+    /** Lascia un feedback sull'ordine selezionato nello storico. */
+    public void lasciaFeedback(Servizio servizio, int voto, String commento) {
+        if (utenteCorrente == null) {
+            view.mostraErrore("Non sei loggato.");
+            return;
+        }
+        if (servizio == null) {
+            view.mostraErrore("Seleziona un ordine dallo storico.");
+            return;
+        }
+        if (voto < 1 || voto > 5) {
+            view.mostraErrore("Il voto deve essere tra 1 e 5.");
+            return;
+        }
+
+        try {
+            model.lasciaFeedback(servizio.id, voto, commento);
+            view.mostraMessaggio("Feedback salvato. Grazie!");
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante il salvataggio del feedback: " + dettaglioErrore(e));
         }
     }
 

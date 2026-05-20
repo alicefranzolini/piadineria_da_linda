@@ -2,6 +2,8 @@ package com.piadineria.data;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Date;
+import java.sql.Time;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -84,6 +86,38 @@ public final class Servizio {
         private static final String INSERT_ASPORTO = """
                 INSERT INTO ASPORTO (orario_ritiro, id_servizio)
                 VALUES (ADDTIME(TIME(NOW()), '00:20:00'), ?)
+                """;
+
+        private static final String CREATE_PRENOTAZIONE = """
+                CREATE TABLE IF NOT EXISTS PRENOTAZIONE_TAVOLO (
+                    id_prenotazione INT NOT NULL AUTO_INCREMENT,
+                    numero_persone INT NOT NULL,
+                    data_prenotazione DATE NOT NULL,
+                    ora_prenotazione TIME NOT NULL,
+                    id_servizio INT NOT NULL,
+                    CONSTRAINT prenotazione_tavolo_pk PRIMARY KEY (id_prenotazione)
+                )
+                """;
+
+        private static final String INSERT_PRENOTAZIONE = """
+                INSERT INTO PRENOTAZIONE_TAVOLO
+                    (numero_persone, data_prenotazione, ora_prenotazione, id_servizio)
+                VALUES (?, ?, ?, ?)
+                """;
+
+        private static final String CREATE_FEEDBACK = """
+                CREATE TABLE IF NOT EXISTS FEEDBACK (
+                    id_feedback INT NOT NULL AUTO_INCREMENT,
+                    voto INT NOT NULL,
+                    commento VARCHAR(500),
+                    id_servizio INT NOT NULL,
+                    CONSTRAINT feedback_pk PRIMARY KEY (id_feedback)
+                )
+                """;
+
+        private static final String INSERT_FEEDBACK = """
+                INSERT INTO FEEDBACK (voto, commento, id_servizio)
+                VALUES (?, ?, ?)
                 """;
 
         // Collega un prodotto al servizio (tabella CONTIENE)
@@ -237,6 +271,43 @@ public final class Servizio {
             }
         }
 
+        public static int prenotaTavolo(Connection connection,
+                                        int idUtente,
+                                        LocalDate giorno,
+                                        LocalTime ora,
+                                        int persone) {
+            try {
+                preparaPrenotazioni(connection);
+                int idServizio = creaServizioBase(connection, idUtente, 0, 0);
+
+                try (var s = DAOUtils.prepareStatement(
+                        connection, INSERT_PRENOTAZIONE,
+                        persone, Date.valueOf(giorno), Time.valueOf(ora), idServizio)) {
+                    s.executeUpdate();
+                }
+
+                inserisciTransizioneIniziale(connection, idServizio);
+                return idServizio;
+            } catch (SQLException e) {
+                throw new DAOException(e);
+            }
+        }
+
+        public static void lasciaFeedback(Connection connection,
+                                          int idServizio,
+                                          int voto,
+                                          String commento) {
+            try {
+                preparaFeedback(connection);
+                try (var s = DAOUtils.prepareStatement(
+                        connection, INSERT_FEEDBACK, voto, commento, idServizio)) {
+                    s.executeUpdate();
+                }
+            } catch (SQLException e) {
+                throw new DAOException(e);
+            }
+        }
+
         // Calcola il totale dell'ordine leggendo i prezzi dal DB
         private static double calcolaTotale(Connection connection,
                                             Map<Integer, Integer> prodotti) throws SQLException {
@@ -266,6 +337,103 @@ public final class Servizio {
                 }
             }
             return 0.0;
+        }
+
+        private static int creaServizioBase(Connection connection, int idUtente,
+                                            double totale, double sconto)
+                throws SQLException {
+            var stmt = connection.prepareStatement(
+                INSERT_SERVIZIO, java.sql.Statement.RETURN_GENERATED_KEYS);
+            stmt.setDouble(1, sconto);
+            stmt.setDouble(2, totale);
+            stmt.setInt(3, idUtente);
+            stmt.executeUpdate();
+
+            var keys = stmt.getGeneratedKeys();
+            if (!keys.next()) throw new DAOException("Creazione servizio fallita");
+            return keys.getInt(1);
+        }
+
+        private static void inserisciTransizioneIniziale(Connection connection,
+                                                        int idServizio)
+                throws SQLException {
+            try (var s = DAOUtils.prepareStatement(
+                    connection, INSERT_TRANSIZIONE, idServizio)) {
+                s.executeUpdate();
+            }
+        }
+
+        private static void preparaPrenotazioni(Connection connection)
+                throws SQLException {
+            try (var stmt = connection.createStatement()) {
+                stmt.executeUpdate(CREATE_PRENOTAZIONE);
+            }
+            aggiungiColonnaSeManca(connection, "PRENOTAZIONE_TAVOLO",
+                "numero_persone", "INT NOT NULL DEFAULT 1");
+            aggiungiColonnaSeManca(connection, "PRENOTAZIONE_TAVOLO",
+                "data_prenotazione", "DATE NULL");
+            aggiungiColonnaSeManca(connection, "PRENOTAZIONE_TAVOLO",
+                "ora_prenotazione", "TIME NULL");
+            rendiNullableSeEsiste(connection, "PRENOTAZIONE_TAVOLO",
+                "dat_giorno", "DATE");
+            rendiNullableSeEsiste(connection, "PRENOTAZIONE_TAVOLO",
+                "ora_prenotazione", "TIME");
+            rendiNullableSeEsiste(connection, "PRENOTAZIONE_TAVOLO",
+                "id_tavolo", "INT");
+        }
+
+        private static void preparaFeedback(Connection connection)
+                throws SQLException {
+            try (var stmt = connection.createStatement()) {
+                stmt.executeUpdate(CREATE_FEEDBACK);
+            }
+            aggiungiColonnaSeManca(connection, "FEEDBACK",
+                "voto", "INT NOT NULL DEFAULT 5");
+            aggiungiColonnaSeManca(connection, "FEEDBACK",
+                "commento", "VARCHAR(500) NULL");
+        }
+
+        private static void aggiungiColonnaSeManca(Connection connection,
+                                                  String tabella,
+                                                  String colonna,
+                                                  String definizione)
+                throws SQLException {
+            var metaData = connection.getMetaData();
+            try (var columns = metaData.getColumns(
+                    connection.getCatalog(), null, tabella, colonna)) {
+                if (columns.next()) return;
+            }
+            try (var stmt = connection.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE " + tabella + " ADD COLUMN "
+                    + colonna + " " + definizione);
+            }
+        }
+
+        private static void rendiNullableSeEsiste(Connection connection,
+                                                  String tabella,
+                                                  String colonna,
+                                                  String definizione)
+                throws SQLException {
+            if (!colonnaEsiste(connection, tabella, colonna)) return;
+            try (var stmt = connection.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE " + tabella + " MODIFY COLUMN "
+                    + colonna + " " + definizione + " NULL");
+            }
+        }
+
+        private static boolean colonnaEsiste(Connection connection,
+                                             String tabella,
+                                             String colonna)
+                throws SQLException {
+            var metaData = connection.getMetaData();
+            try (var columns = metaData.getColumns(
+                    connection.getCatalog(), null, tabella, colonna)) {
+                if (columns.next()) return true;
+            }
+            try (var columns = metaData.getColumns(
+                    connection.getCatalog(), null, tabella.toLowerCase(), colonna)) {
+                return columns.next();
+            }
         }
     }
 }
