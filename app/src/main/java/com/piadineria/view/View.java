@@ -50,6 +50,8 @@ public final class View {
     private DefaultListModel<StatisticaProdotto> modelStats;
     private JList<StatisticaProdotto> listaAdminStats;
     private DefaultListModel<StatisticaProdotto> modelAdminStats;
+    private JList<Servizio> listaPrenotazioniTavoli;
+    private DefaultListModel<Servizio> modelPrenotazioniTavoli;
     private JList<Servizio> listaDelivery;
     private DefaultListModel<Servizio> modelDelivery;
     private JLabel labelFattorino;
@@ -164,6 +166,15 @@ public final class View {
         ordini.forEach(modelDelivery::addElement);
     }
 
+    public void mostraDettaglioOrdine(DettaglioOrdine dettaglio) {
+        var area = new JTextArea(dettaglio.testo(), 10, 35);
+        area.setEditable(false);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        JOptionPane.showMessageDialog(frame, new JScrollPane(area),
+            "Dettagli ordine", JOptionPane.INFORMATION_MESSAGE);
+    }
+
     public void pulisciFormFattorino() {
         campoNomeFattorino.setText("");
         campoCognomeFattorino.setText("");
@@ -181,6 +192,11 @@ public final class View {
     public void mostraFattorini(List<Fattorino> fattorini) {
         modelFattorini.clear();
         fattorini.forEach(modelFattorini::addElement);
+    }
+
+    public void mostraPrenotazioniTavoli(List<Servizio> prenotazioni) {
+        modelPrenotazioniTavoli.clear();
+        prenotazioni.forEach(modelPrenotazioniTavoli::addElement);
     }
 
     public void mostraErrore(String messaggio) {
@@ -542,11 +558,31 @@ public final class View {
 
         var azioni = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         azioni.setOpaque(false);
+        var btnPresaInCarico = creaBottone("Presa in carico");
+        var btnRitirato = creaBottone("Ritirato");
+        var btnInConsegna = creaBottone("In consegna");
+        var btnConsegnato = creaBottone("Consegnato");
+        var btnDettagliOrdine = creaBottone("Dettagli ordine");
         var btnAggiorna = creaBottone("Aggiorna");
+        azioni.add(btnDettagliOrdine);
+        azioni.add(btnPresaInCarico);
+        azioni.add(btnRitirato);
+        azioni.add(btnInConsegna);
+        azioni.add(btnConsegnato);
         azioni.add(btnAggiorna);
         panel.add(azioni, BorderLayout.SOUTH);
 
         btnLogout.addActionListener(e -> controller.logout());
+        btnDettagliOrdine.addActionListener(e ->
+            controller.mostraDettagliOrdineDelivery(listaDelivery.getSelectedValue()));
+        btnPresaInCarico.addActionListener(e -> controller.aggiornaStatoOrdineDelivery(
+            listaDelivery.getSelectedValue(), "presa in carico"));
+        btnRitirato.addActionListener(e -> controller.aggiornaStatoOrdineDelivery(
+            listaDelivery.getSelectedValue(), "ritirato"));
+        btnInConsegna.addActionListener(e -> controller.aggiornaStatoOrdineDelivery(
+            listaDelivery.getSelectedValue(), "in consegna"));
+        btnConsegnato.addActionListener(e -> controller.aggiornaStatoOrdineDelivery(
+            listaDelivery.getSelectedValue(), "consegnato"));
         btnAggiorna.addActionListener(e -> controller.caricaOrdiniDelivery());
 
         return panel;
@@ -574,13 +610,15 @@ public final class View {
         var corpo = new JPanel(new BorderLayout(10, 10));
         corpo.setOpaque(false);
 
-        var menuAdmin = new JPanel(new GridLayout(1, 3, 10, 0));
+        var menuAdmin = new JPanel(new GridLayout(1, 4, 10, 0));
         menuAdmin.setOpaque(false);
         var btnGestioneFattorini = creaBottone("Gestione fattorini");
         var btnStatisticheAdmin = creaBottone("Statistiche");
+        var btnGestioneTavoli = creaBottone("Gestione tavoli");
         var btnModificaMenu = creaBottone("Modifica menu");
         menuAdmin.add(btnGestioneFattorini);
         menuAdmin.add(btnStatisticheAdmin);
+        menuAdmin.add(btnGestioneTavoli);
         menuAdmin.add(btnModificaMenu);
         corpo.add(menuAdmin, BorderLayout.NORTH);
 
@@ -641,6 +679,22 @@ public final class View {
         panelListaFattorini.add(azioniFattorini, BorderLayout.SOUTH);
         panelFattorini.add(panelListaFattorini);
 
+        var panelTavoli = new JPanel(new BorderLayout(5, 5));
+        panelTavoli.setOpaque(false);
+        panelTavoli.setBorder(BorderFactory.createTitledBorder("Prenotazioni tavoli"));
+        modelPrenotazioniTavoli = new DefaultListModel<>();
+        listaPrenotazioniTavoli = new JList<>(modelPrenotazioniTavoli);
+        panelTavoli.add(new JScrollPane(listaPrenotazioniTavoli), BorderLayout.CENTER);
+        var azioniTavoli = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+        azioniTavoli.setOpaque(false);
+        var btnAggiornaTavoli = creaBottone("Aggiorna");
+        var btnConfermaTavolo = creaBottone("Conferma");
+        var btnRifiutaTavolo = new JButton("Rifiuta");
+        azioniTavoli.add(btnAggiornaTavoli);
+        azioniTavoli.add(btnConfermaTavolo);
+        azioniTavoli.add(btnRifiutaTavolo);
+        panelTavoli.add(azioniTavoli, BorderLayout.SOUTH);
+
         var panelProdotto = new JPanel(new GridBagLayout());
         panelProdotto.setOpaque(false);
         panelProdotto.setBorder(BorderFactory.createTitledBorder("Nuovo prodotto"));
@@ -664,6 +718,7 @@ public final class View {
 
         adminCards.add(panelFattorini, "FATTORINI");
         adminCards.add(panelStats, "STATISTICHE");
+        adminCards.add(panelTavoli, "TAVOLI");
         adminCards.add(panelProdotto, "MENU");
         corpo.add(adminCards, BorderLayout.CENTER);
         panel.add(corpo, BorderLayout.CENTER);
@@ -677,6 +732,10 @@ public final class View {
             adminCardLayout.show(adminCards, "STATISTICHE");
             controller.caricaAdmin();
         });
+        btnGestioneTavoli.addActionListener(e -> {
+            adminCardLayout.show(adminCards, "TAVOLI");
+            controller.caricaPrenotazioniTavoli();
+        });
         btnModificaMenu.addActionListener(e -> adminCardLayout.show(adminCards, "MENU"));
         btnAggiorna.addActionListener(e -> controller.caricaAdmin());
         btnCreaFattorino.addActionListener(e -> controller.registraFattorino(
@@ -688,6 +747,11 @@ public final class View {
         btnListaFattorini.addActionListener(e -> controller.caricaFattorini());
         btnEliminaFattorino.addActionListener(e ->
             controller.eliminaFattorino(listaFattorini.getSelectedValue()));
+        btnAggiornaTavoli.addActionListener(e -> controller.caricaPrenotazioniTavoli());
+        btnConfermaTavolo.addActionListener(e ->
+            controller.confermaPrenotazioneTavolo(listaPrenotazioniTavoli.getSelectedValue()));
+        btnRifiutaTavolo.addActionListener(e ->
+            controller.rifiutaPrenotazioneTavolo(listaPrenotazioniTavoli.getSelectedValue()));
         btnCreaProdotto.addActionListener(e -> controller.registraProdotto(
             campoNomeProdotto.getText(),
             campoDescrizioneProdotto.getText(),

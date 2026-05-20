@@ -95,6 +95,26 @@ public final class ModelImpl implements Model {
     }
 
     @Override
+    public void aggiornaStatoOrdine(int idServizio, String nomeStato) {
+        Servizio.DAO.aggiornaStato(connection, idServizio, nomeStato);
+    }
+
+    @Override
+    public DettaglioOrdine getDettaglioOrdine(int idServizio) {
+        return DettaglioOrdine.DAO.find(connection, idServizio);
+    }
+
+    @Override
+    public List<Servizio> getPrenotazioniTavoli() {
+        return Servizio.DAO.prenotazioni(connection);
+    }
+
+    @Override
+    public void aggiornaStatoPrenotazione(int idServizio, String nomeStato) {
+        Servizio.DAO.aggiornaStato(connection, idServizio, nomeStato);
+    }
+
+    @Override
     public List<StatisticaProdotto> getStatistiche() {
         return StatisticaProdotto.DAO.lista(connection);
     }

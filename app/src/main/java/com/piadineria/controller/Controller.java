@@ -299,7 +299,7 @@ public final class Controller {
             }
 
             int id = model.prenotaTavolo(utenteCorrente.id, giorno, ora, persone);
-            view.mostraMessaggio("Prenotazione tavolo #" + id + " confermata.");
+            view.mostraMessaggio("Prenotazione tavolo #" + id + " inviata. Stato: in attesa.");
             caricaStorico();
         } catch (DateTimeParseException e) {
             view.mostraErrore("Usa data AAAA-MM-GG e ora HH:MM, per esempio 2026-05-20 e 20:30.");
@@ -350,6 +350,44 @@ public final class Controller {
         view.mostraOrdiniDelivery(ordini);
     }
 
+    /** Aggiorna lo stato dell'ordine selezionato dal fattorino. */
+    public void aggiornaStatoOrdineDelivery(Servizio ordine, String stato) {
+        if (fattorinoCorrente == null) {
+            view.mostraErrore("Accedi come fattorino.");
+            return;
+        }
+        if (ordine == null) {
+            view.mostraErrore("Seleziona un ordine delivery.");
+            return;
+        }
+
+        try {
+            model.aggiornaStatoOrdine(ordine.id, stato);
+            view.mostraMessaggio("Stato aggiornato: " + stato + ".");
+            caricaOrdiniDelivery();
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante l'aggiornamento dello stato: " + dettaglioErrore(e));
+        }
+    }
+
+    /** Mostra al fattorino i dettagli dell'ordine selezionato. */
+    public void mostraDettagliOrdineDelivery(Servizio ordine) {
+        if (fattorinoCorrente == null) {
+            view.mostraErrore("Accedi come fattorino.");
+            return;
+        }
+        if (ordine == null) {
+            view.mostraErrore("Seleziona un ordine delivery.");
+            return;
+        }
+
+        try {
+            view.mostraDettaglioOrdine(model.getDettaglioOrdine(ordine.id));
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante il caricamento dei dettagli: " + dettaglioErrore(e));
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Statistiche (amministratore)
     // -------------------------------------------------------------------------
@@ -393,6 +431,40 @@ public final class Controller {
             caricaFattorini();
         } catch (DAOException e) {
             view.mostraErrore("Errore durante l'eliminazione del fattorino: " + dettaglioErrore(e));
+        }
+    }
+
+    /** Carica le prenotazioni tavolo per l'admin. */
+    public void caricaPrenotazioniTavoli() {
+        try {
+            view.mostraPrenotazioniTavoli(model.getPrenotazioniTavoli());
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante il caricamento delle prenotazioni: " + dettaglioErrore(e));
+        }
+    }
+
+    /** Conferma la prenotazione tavolo selezionata. */
+    public void confermaPrenotazioneTavolo(Servizio prenotazione) {
+        aggiornaPrenotazioneTavolo(prenotazione, "confermata");
+    }
+
+    /** Rifiuta la prenotazione tavolo selezionata. */
+    public void rifiutaPrenotazioneTavolo(Servizio prenotazione) {
+        aggiornaPrenotazioneTavolo(prenotazione, "rifiutata");
+    }
+
+    private void aggiornaPrenotazioneTavolo(Servizio prenotazione, String stato) {
+        if (prenotazione == null) {
+            view.mostraErrore("Seleziona una prenotazione tavolo.");
+            return;
+        }
+
+        try {
+            model.aggiornaStatoPrenotazione(prenotazione.id, stato);
+            view.mostraMessaggio("Prenotazione " + stato + ".");
+            caricaPrenotazioniTavoli();
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante l'aggiornamento della prenotazione: " + dettaglioErrore(e));
         }
     }
 

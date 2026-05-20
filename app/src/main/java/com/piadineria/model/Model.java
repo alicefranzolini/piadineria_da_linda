@@ -76,6 +76,18 @@ public interface Model {
     /** Ordini delivery visibili al fattorino. */
     List<Servizio> getOrdiniDelivery();
 
+    /** Aggiorna lo stato di un ordine delivery. */
+    void aggiornaStatoOrdine(int idServizio, String nomeStato);
+
+    /** Dettaglio operativo di un ordine delivery. */
+    DettaglioOrdine getDettaglioOrdine(int idServizio);
+
+    /** Prenotazioni tavolo visibili all'admin. */
+    List<Servizio> getPrenotazioniTavoli();
+
+    /** Aggiorna lo stato di una prenotazione. */
+    void aggiornaStatoPrenotazione(int idServizio, String nomeStato);
+
     // ---------- Statistiche (amministratore) ----------
 
     /** Statistiche di vendita per prodotto. */

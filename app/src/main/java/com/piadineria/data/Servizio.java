@@ -67,12 +67,12 @@ public final class Servizio {
                 ORDER BY s.giorno_creazione DESC, s.ora_creazione DESC
                 """;
 
-        // Crea il record base in SERVIZIO (stato = 1 = 'preso in carico')
+        // Crea il record base in SERVIZIO. Lo stato viene impostato subito dopo.
         private static final String INSERT_SERVIZIO = """
                 INSERT INTO SERVIZIO
                     (sconto_applicato, totale_costo, ora_creazione,
                      giorno_creazione, id_utente, id_stato)
-                VALUES (?, ?, TIME(NOW()), DATE(NOW()), ?, 1)
+                VALUES (?, ?, TIME(NOW()), DATE(NOW()), ?, ?)
                 """;
 
         // Aggiunge la riga in DELIVERY
@@ -129,7 +129,7 @@ public final class Servizio {
         // Registra la transizione di stato iniziale
         private static final String INSERT_TRANSIZIONE = """
                 INSERT INTO TRANSIZIONE_STATO (id_servizio, id_stato, data_transizione)
-                VALUES (?, 1, NOW())
+                VALUES (?, ?, NOW())
                 """;
 
         // Aggiorna il contatore della tessera fedeltà
@@ -149,6 +149,35 @@ public final class Servizio {
                 JOIN   STATO_SERVIZIO ss ON s.id_stato = ss.id_stato
                 JOIN   DELIVERY d ON s.id_servizio = d.id_servizio
                 ORDER BY s.giorno_creazione DESC, s.ora_creazione DESC
+                """;
+
+        private static final String PRENOTAZIONI_QUERY = """
+                SELECT s.id_servizio,
+                       'PRENOTAZIONE' AS tipo,
+                       s.totale_costo, s.sconto_applicato,
+                       ss.nome_stato, s.giorno_creazione, s.ora_creazione
+                FROM   SERVIZIO s
+                JOIN   STATO_SERVIZIO ss ON s.id_stato = ss.id_stato
+                JOIN   PRENOTAZIONE_TAVOLO pt ON s.id_servizio = pt.id_servizio
+                ORDER BY s.giorno_creazione DESC, s.ora_creazione DESC
+                """;
+
+        private static final String UPDATE_STATO = """
+                UPDATE SERVIZIO
+                SET id_stato = ?
+                WHERE id_servizio = ?
+                """;
+
+        private static final String FIND_STATO = """
+                SELECT id_stato
+                FROM   STATO_SERVIZIO
+                WHERE  LOWER(nome_stato) = LOWER(?)
+                LIMIT  1
+                """;
+
+        private static final String INSERT_STATO = """
+                INSERT INTO STATO_SERVIZIO (nome_stato)
+                VALUES (?)
                 """;
 
         /**
@@ -200,6 +229,30 @@ public final class Servizio {
             return lista;
         }
 
+        public static List<Servizio> prenotazioni(Connection connection) {
+            preparaCompatibilitaPrenotazioni(connection);
+            var lista = new ArrayList<Servizio>();
+            try (
+                var stmt = DAOUtils.prepareStatement(connection, PRENOTAZIONI_QUERY);
+                var rs   = stmt.executeQuery()
+            ) {
+                while (rs.next()) {
+                    lista.add(new Servizio(
+                        rs.getInt("id_servizio"),
+                        rs.getString("tipo"),
+                        rs.getDouble("totale_costo"),
+                        rs.getDouble("sconto_applicato"),
+                        rs.getString("nome_stato"),
+                        rs.getDate("giorno_creazione").toLocalDate(),
+                        rs.getTime("ora_creazione").toLocalTime()
+                    ));
+                }
+            } catch (SQLException e) {
+                throw new DAOException(e);
+            }
+            return lista;
+        }
+
         /**
          * Crea un nuovo ordine (delivery o asporto) con i prodotti scelti.
          * map prodotti: id_prodotto -> quantita
@@ -219,16 +272,9 @@ public final class Servizio {
                 double totaleScontato = totale * (1 - sconto / 100.0);
 
                 // 1. Inserisci il servizio base
-                var stmt = connection.prepareStatement(
-                    INSERT_SERVIZIO, java.sql.Statement.RETURN_GENERATED_KEYS);
-                stmt.setDouble(1, sconto);
-                stmt.setDouble(2, totaleScontato);
-                stmt.setInt(3, idUtente);
-                stmt.executeUpdate();
-
-                var keys = stmt.getGeneratedKeys();
-                if (!keys.next()) throw new DAOException("Creazione servizio fallita");
-                int idServizio = keys.getInt(1);
+                int idStatoInAttesa = getOrCreateStato(connection, "in attesa");
+                int idServizio = creaServizioBase(
+                    connection, idUtente, totaleScontato, sconto, idStatoInAttesa);
 
                 // 2. Inserisci il tipo specifico
                 if ("DELIVERY".equals(tipo)) {
@@ -253,10 +299,7 @@ public final class Servizio {
                 }
 
                 // 4. Registra la transizione di stato iniziale
-                try (var s = DAOUtils.prepareStatement(
-                        connection, INSERT_TRANSIZIONE, idServizio)) {
-                    s.executeUpdate();
-                }
+                inserisciTransizioneIniziale(connection, idServizio, idStatoInAttesa);
 
                 // 5. Aggiorna la tessera fedeltà
                 try (var s = DAOUtils.prepareStatement(
@@ -278,7 +321,8 @@ public final class Servizio {
                                         int persone) {
             try {
                 preparaPrenotazioni(connection);
-                int idServizio = creaServizioBase(connection, idUtente, 0, 0);
+                int idStatoInAttesa = getOrCreateStato(connection, "in attesa");
+                int idServizio = creaServizioBase(connection, idUtente, 0, 0, idStatoInAttesa);
 
                 try (var s = DAOUtils.prepareStatement(
                         connection, INSERT_PRENOTAZIONE,
@@ -286,7 +330,7 @@ public final class Servizio {
                     s.executeUpdate();
                 }
 
-                inserisciTransizioneIniziale(connection, idServizio);
+                inserisciTransizioneIniziale(connection, idServizio, idStatoInAttesa);
                 return idServizio;
             } catch (SQLException e) {
                 throw new DAOException(e);
@@ -301,6 +345,20 @@ public final class Servizio {
                 preparaFeedback(connection);
                 try (var s = DAOUtils.prepareStatement(
                         connection, INSERT_FEEDBACK, voto, commento, idServizio)) {
+                    s.executeUpdate();
+                }
+            } catch (SQLException e) {
+                throw new DAOException(e);
+            }
+        }
+
+        public static void aggiornaStato(Connection connection,
+                                         int idServizio,
+                                         String nomeStato) {
+            try {
+                int idStato = getOrCreateStato(connection, nomeStato);
+                try (var s = DAOUtils.prepareStatement(
+                        connection, UPDATE_STATO, idStato, idServizio)) {
                     s.executeUpdate();
                 }
             } catch (SQLException e) {
@@ -340,13 +398,15 @@ public final class Servizio {
         }
 
         private static int creaServizioBase(Connection connection, int idUtente,
-                                            double totale, double sconto)
+                                            double totale, double sconto,
+                                            int idStato)
                 throws SQLException {
             var stmt = connection.prepareStatement(
                 INSERT_SERVIZIO, java.sql.Statement.RETURN_GENERATED_KEYS);
             stmt.setDouble(1, sconto);
             stmt.setDouble(2, totale);
             stmt.setInt(3, idUtente);
+            stmt.setInt(4, idStato);
             stmt.executeUpdate();
 
             var keys = stmt.getGeneratedKeys();
@@ -355,15 +415,29 @@ public final class Servizio {
         }
 
         private static void inserisciTransizioneIniziale(Connection connection,
-                                                        int idServizio)
+                                                        int idServizio,
+                                                        int idStato)
                 throws SQLException {
             try (var s = DAOUtils.prepareStatement(
-                    connection, INSERT_TRANSIZIONE, idServizio)) {
+                    connection, INSERT_TRANSIZIONE, idServizio, idStato)) {
                 s.executeUpdate();
             }
         }
 
         private static void preparaPrenotazioni(Connection connection)
+                throws SQLException {
+            preparaCompatibilitaPrenotazioni(connection);
+        }
+
+        private static void preparaCompatibilitaPrenotazioni(Connection connection) {
+            try {
+                preparaCompatibilitaPrenotazioniChecked(connection);
+            } catch (SQLException e) {
+                throw new DAOException(e);
+            }
+        }
+
+        private static void preparaCompatibilitaPrenotazioniChecked(Connection connection)
                 throws SQLException {
             try (var stmt = connection.createStatement()) {
                 stmt.executeUpdate(CREATE_PRENOTAZIONE);
@@ -376,6 +450,10 @@ public final class Servizio {
                 "ora_prenotazione", "TIME NULL");
             rendiNullableSeEsiste(connection, "PRENOTAZIONE_TAVOLO",
                 "dat_giorno", "DATE");
+            rendiNullableSeEsiste(connection, "PRENOTAZIONE_TAVOLO",
+                "dat_ora_inizio", "TIME");
+            rendiNullableSeEsiste(connection, "PRENOTAZIONE_TAVOLO",
+                "dat_ora_fine", "TIME");
             rendiNullableSeEsiste(connection, "PRENOTAZIONE_TAVOLO",
                 "ora_prenotazione", "TIME");
             rendiNullableSeEsiste(connection, "PRENOTAZIONE_TAVOLO",
@@ -391,6 +469,28 @@ public final class Servizio {
                 "voto", "INT NOT NULL DEFAULT 5");
             aggiungiColonnaSeManca(connection, "FEEDBACK",
                 "commento", "VARCHAR(500) NULL");
+            rendiNullableSeEsiste(connection, "FEEDBACK",
+                "dat_giorno", "DATE");
+            rendiNullableSeEsiste(connection, "FEEDBACK",
+                "dat_ora", "TIME");
+            rendiNullableSeEsiste(connection, "FEEDBACK",
+                "dat_ora_inizio", "TIME");
+        }
+
+        private static int getOrCreateStato(Connection connection, String nomeStato)
+                throws SQLException {
+            try (var stmt = DAOUtils.prepareStatement(connection, FIND_STATO, nomeStato);
+                 var rs = stmt.executeQuery()) {
+                if (rs.next()) return rs.getInt("id_stato");
+            }
+
+            var stmt = connection.prepareStatement(
+                INSERT_STATO, java.sql.Statement.RETURN_GENERATED_KEYS);
+            stmt.setString(1, nomeStato);
+            stmt.executeUpdate();
+            var keys = stmt.getGeneratedKeys();
+            if (!keys.next()) throw new DAOException("Creazione stato fallita");
+            return keys.getInt(1);
         }
 
         private static void aggiungiColonnaSeManca(Connection connection,
