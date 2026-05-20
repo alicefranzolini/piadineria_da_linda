@@ -7,21 +7,17 @@ repositories {
 }
 
 dependencies {
-    implementation("com.mysql:mysql-connector-j:9.3.0")
-    testImplementation("org.assertj:assertj-core:3.27.3")
-    testImplementation(libs.junit)
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
-    }
-}
-
-tasks.compileJava {
-    options.encoding = "UTF-8"
+    // Driver JDBC per MySQL - permette a Java di parlare con MySQL Workbench
+    implementation("com.mysql:mysql-connector-j:8.3.0")
 }
 
 application {
-    mainClass = "db_lab.App"
+    // Punto di ingresso dell'applicazione
+    mainClass.set("com.piadineria.App")
 }
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
