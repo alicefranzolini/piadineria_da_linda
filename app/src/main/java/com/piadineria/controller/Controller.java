@@ -28,6 +28,7 @@ public final class Controller {
 
     // Utente attualmente loggato (null se nessuno)
     private Utente utenteCorrente;
+    private Fattorino fattorinoCorrente;
 
     // Carrello corrente: id_prodotto -> quantita
     private final Map<Integer, Integer> carrello = new LinkedHashMap<>();
@@ -81,8 +82,9 @@ public final class Controller {
             return;
         }
         utenteCorrente = null;
+        fattorinoCorrente = null;
         carrello.clear();
-        caricaStatistiche();
+        caricaAdmin();
     }
 
     private void loginFattorino(String email, String password) {
@@ -90,9 +92,15 @@ public final class Controller {
             view.mostraErrore("Inserisci email e password del fattorino.");
             return;
         }
+        var risultato = model.loginFattorino(email, password);
+        if (risultato.isEmpty()) {
+            view.mostraErrore("Credenziali fattorino errate.");
+            return;
+        }
         utenteCorrente = null;
+        fattorinoCorrente = risultato.get();
         carrello.clear();
-        view.mostraFattorino("Fattorino");
+        view.mostraFattorino(fattorinoCorrente.nomeCompleto());
         caricaOrdiniDelivery();
     }
 
@@ -111,9 +119,49 @@ public final class Controller {
         }
     }
 
+    /** Registra un fattorino. Questa azione viene esposta solo nell'area admin. */
+    public void registraFattorino(String nome, String cognome, String email, String password) {
+        if (nome.isBlank() || cognome.isBlank() || email.isBlank() || password.isBlank()) {
+            view.mostraErrore("Compila tutti i campi del fattorino.");
+            return;
+        }
+        try {
+            model.registraFattorino(nome, cognome, email, password);
+            view.mostraMessaggio("Fattorino registrato. Ora puo accedere con email e password.");
+            view.pulisciFormFattorino();
+        } catch (DAOException e) {
+            view.mostraErrore("Email fattorino gia registrata o errore nel database.");
+        }
+    }
+
+    /** Registra un nuovo prodotto. Questa azione viene esposta solo nell'area admin. */
+    public void registraProdotto(String nome, String descrizione,
+                                 String prezzoTesto, String categoria) {
+        if (nome.isBlank() || descrizione.isBlank() || prezzoTesto.isBlank()) {
+            view.mostraErrore("Compila tutti i campi del prodotto.");
+            return;
+        }
+
+        try {
+            double prezzo = Double.parseDouble(prezzoTesto.replace(",", "."));
+            if (prezzo <= 0) {
+                view.mostraErrore("Il prezzo deve essere maggiore di zero.");
+                return;
+            }
+            model.registraProdotto(nome, descrizione, prezzo, categoria);
+            view.mostraMessaggio("Prodotto aggiunto al menu.");
+            view.pulisciFormProdotto();
+        } catch (NumberFormatException e) {
+            view.mostraErrore("Inserisci un prezzo valido, per esempio 6.50.");
+        } catch (DAOException e) {
+            view.mostraErrore("Prodotto gia presente o errore nel database.");
+        }
+    }
+
     /** Logout: torna alla schermata di login. */
     public void logout() {
         utenteCorrente = null;
+        fattorinoCorrente = null;
         carrello.clear();
         view.mostraLogin();
     }
@@ -212,6 +260,12 @@ public final class Controller {
     public void caricaStatistiche() {
         var stats = model.getStatistiche();
         view.mostraStatistiche(stats);
+    }
+
+    /** Carica la dashboard amministratore. */
+    public void caricaAdmin() {
+        var stats = model.getStatistiche();
+        view.mostraAdmin(stats);
     }
 
     /** Torna indietro dalla schermata statistiche in base al ruolo corrente. */

@@ -22,13 +22,23 @@ public interface Model {
     /** Tenta il login. Restituisce Optional.empty() se fallisce. */
     Optional<Utente> login(String email, String password);
 
+    /** Tenta il login di un fattorino. */
+    Optional<Fattorino> loginFattorino(String email, String password);
+
     /** Registra un nuovo utente. Restituisce l'id creato. */
     int registraUtente(String nome, String cognome, String email, String password);
+
+    /** Registra un nuovo fattorino. Restituisce l'id creato. */
+    int registraFattorino(String nome, String cognome, String email, String password);
 
     // ---------- Menù ----------
 
     /** Lista tutti i prodotti disponibili (per la schermata principale). */
     List<Prodotto> getProdottiDisponibili();
+
+    /** Registra un nuovo prodotto nel menu. */
+    int registraProdotto(String nome, String descrizione,
+                         double prezzo, String categoria);
 
     // ---------- Ordini ----------
 

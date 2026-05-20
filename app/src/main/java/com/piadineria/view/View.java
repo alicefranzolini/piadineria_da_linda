@@ -6,6 +6,7 @@ import com.piadineria.data.*;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -37,13 +38,26 @@ public final class View {
     private JLabel         labelBenvenuto;
     private JList<Prodotto> listaProdotti;
     private DefaultListModel<Prodotto> modelProdotti;
+    private final List<Prodotto> prodottiDisponibili = new ArrayList<>();
+    private String filtroProdotti = "CIBO";
     private JLabel         labelCarrello;
     private JList<Servizio> listaStorico;
     private DefaultListModel<Servizio> modelStorico;
     private JList<StatisticaProdotto> listaStats;
     private DefaultListModel<StatisticaProdotto> modelStats;
+    private JList<StatisticaProdotto> listaAdminStats;
+    private DefaultListModel<StatisticaProdotto> modelAdminStats;
     private JList<Servizio> listaDelivery;
     private DefaultListModel<Servizio> modelDelivery;
+    private JLabel labelFattorino;
+    private JTextField campoNomeFattorino;
+    private JTextField campoCognomeFattorino;
+    private JTextField campoEmailFattorino;
+    private JPasswordField campoPasswordFattorino;
+    private JTextField campoNomeProdotto;
+    private JTextField campoDescrizioneProdotto;
+    private JTextField campoPrezzoProdotto;
+    private JComboBox<String> comboCategoriaProdotto;
 
     public View() {
         frame = new JFrame("Piadineria Da Linda 🫓");
@@ -61,6 +75,7 @@ public final class View {
         cards.add(creaSchermatHome(),        "HOME");
         cards.add(creaSchermatStatistiche(), "STATISTICHE");
         cards.add(creaSchermatFattorino(),   "FATTORINO");
+        cards.add(creaSchermatAdmin(),       "ADMIN");
     }
 
     /** Collega il controller alla view (chiamato dopo la creazione). */
@@ -87,8 +102,9 @@ public final class View {
     }
 
     public void mostraProdotti(List<Prodotto> prodotti) {
-        modelProdotti.clear();
-        prodotti.forEach(modelProdotti::addElement);
+        prodottiDisponibili.clear();
+        prodottiDisponibili.addAll(prodotti);
+        filtraProdotti();
     }
 
     public void mostraStorico(List<Servizio> storico) {
@@ -107,12 +123,33 @@ public final class View {
     }
 
     public void mostraFattorino(String nome) {
+        labelFattorino.setText("Area fattorino - " + nome);
         cardLayout.show(cards, "FATTORINO");
+    }
+
+    public void mostraAdmin(List<StatisticaProdotto> stats) {
+        modelAdminStats.clear();
+        stats.forEach(modelAdminStats::addElement);
+        cardLayout.show(cards, "ADMIN");
     }
 
     public void mostraOrdiniDelivery(List<Servizio> ordini) {
         modelDelivery.clear();
         ordini.forEach(modelDelivery::addElement);
+    }
+
+    public void pulisciFormFattorino() {
+        campoNomeFattorino.setText("");
+        campoCognomeFattorino.setText("");
+        campoEmailFattorino.setText("");
+        campoPasswordFattorino.setText("");
+    }
+
+    public void pulisciFormProdotto() {
+        campoNomeProdotto.setText("");
+        campoDescrizioneProdotto.setText("");
+        campoPrezzoProdotto.setText("");
+        comboCategoriaProdotto.setSelectedItem("Cibo");
     }
 
     public void mostraErrore(String messaggio) {
@@ -289,7 +326,25 @@ public final class View {
         listaProdotti.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         var panelProdotti = new JPanel(new BorderLayout(5, 5));
         panelProdotti.setOpaque(false);
-        panelProdotti.add(new JLabel("📋 Menù"), BorderLayout.NORTH);
+        var headerProdotti = new JPanel(new BorderLayout());
+        headerProdotti.setOpaque(false);
+        headerProdotti.add(new JLabel("Menu"), BorderLayout.WEST);
+        var filtriProdotti = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        filtriProdotti.setOpaque(false);
+        var filtroCibo = new JRadioButton("Cibo");
+        var filtroBevande = new JRadioButton("Bevande");
+        filtroCibo.setSelected(true);
+        for (var radio : List.of(filtroCibo, filtroBevande)) {
+            radio.setOpaque(false);
+            radio.setForeground(COLORE_PRIMARIO);
+        }
+        var gruppoFiltri = new ButtonGroup();
+        gruppoFiltri.add(filtroCibo);
+        gruppoFiltri.add(filtroBevande);
+        filtriProdotti.add(filtroCibo);
+        filtriProdotti.add(filtroBevande);
+        headerProdotti.add(filtriProdotti, BorderLayout.EAST);
+        panelProdotti.add(headerProdotti, BorderLayout.NORTH);
         panelProdotti.add(new JScrollPane(listaProdotti), BorderLayout.CENTER);
 
         // Bottoni ordine
@@ -325,6 +380,15 @@ public final class View {
 
         // --- AZIONI ---
         btnLogout.addActionListener(e -> controller.logout());
+
+        filtroCibo.addActionListener(e -> {
+            filtroProdotti = "CIBO";
+            filtraProdotti();
+        });
+        filtroBevande.addActionListener(e -> {
+            filtroProdotti = "BEVANDE";
+            filtraProdotti();
+        });
 
         btnAggiungi.addActionListener(e -> {
             var sel = listaProdotti.getSelectedValue();
@@ -384,10 +448,10 @@ public final class View {
         header.setBackground(COLORE_PRIMARIO);
         header.setBorder(new EmptyBorder(8, 12, 8, 12));
 
-        var titolo = new JLabel("Area fattorino");
-        titolo.setFont(new Font("Serif", Font.BOLD, 18));
-        titolo.setForeground(Color.WHITE);
-        header.add(titolo, BorderLayout.WEST);
+        labelFattorino = new JLabel("Area fattorino");
+        labelFattorino.setFont(new Font("Serif", Font.BOLD, 18));
+        labelFattorino.setForeground(Color.WHITE);
+        header.add(labelFattorino, BorderLayout.WEST);
 
         var btnLogout = new JButton("Esci");
         btnLogout.setForeground(COLORE_PRIMARIO);
@@ -413,6 +477,137 @@ public final class View {
         btnAggiorna.addActionListener(e -> controller.caricaOrdiniDelivery());
 
         return panel;
+    }
+
+    private JPanel creaSchermatAdmin() {
+        var panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBackground(COLORE_SECONDARIO);
+        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        var header = new JPanel(new BorderLayout());
+        header.setBackground(COLORE_PRIMARIO);
+        header.setBorder(new EmptyBorder(8, 12, 8, 12));
+
+        var titolo = new JLabel("Area admin");
+        titolo.setFont(new Font("Serif", Font.BOLD, 18));
+        titolo.setForeground(Color.WHITE);
+        header.add(titolo, BorderLayout.WEST);
+
+        var btnLogout = new JButton("Esci");
+        btnLogout.setForeground(COLORE_PRIMARIO);
+        header.add(btnLogout, BorderLayout.EAST);
+        panel.add(header, BorderLayout.NORTH);
+
+        var contenuto = new JPanel(new GridLayout(1, 3, 10, 0));
+        contenuto.setOpaque(false);
+
+        modelAdminStats = new DefaultListModel<>();
+        listaAdminStats = new JList<>(modelAdminStats);
+        listaAdminStats.setFont(new Font("Monospaced", Font.PLAIN, 13));
+        var panelStats = new JPanel(new BorderLayout(5, 5));
+        panelStats.setOpaque(false);
+        panelStats.add(new JLabel("Statistiche di vendita"), BorderLayout.NORTH);
+        panelStats.add(new JScrollPane(listaAdminStats), BorderLayout.CENTER);
+        contenuto.add(panelStats);
+
+        var panelFattorino = new JPanel(new GridBagLayout());
+        panelFattorino.setOpaque(false);
+        panelFattorino.setBorder(BorderFactory.createTitledBorder("Nuovo fattorino"));
+        var gbc = new GridBagConstraints();
+        gbc.insets = new Insets(6, 8, 6, 8);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        campoNomeFattorino = new JTextField(20);
+        campoCognomeFattorino = new JTextField(20);
+        campoEmailFattorino = new JTextField(20);
+        campoPasswordFattorino = new JPasswordField(20);
+
+        aggiungiCampo(panelFattorino, gbc, 0, "Nome:", campoNomeFattorino);
+        aggiungiCampo(panelFattorino, gbc, 1, "Cognome:", campoCognomeFattorino);
+        aggiungiCampo(panelFattorino, gbc, 2, "Email:", campoEmailFattorino);
+        aggiungiCampo(panelFattorino, gbc, 3, "Password:", campoPasswordFattorino);
+
+        var btnCreaFattorino = creaBottone("Crea fattorino");
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
+        panelFattorino.add(btnCreaFattorino, gbc);
+        contenuto.add(panelFattorino);
+
+        var panelProdotto = new JPanel(new GridBagLayout());
+        panelProdotto.setOpaque(false);
+        panelProdotto.setBorder(BorderFactory.createTitledBorder("Nuovo prodotto"));
+        var gbcProdotto = new GridBagConstraints();
+        gbcProdotto.insets = new Insets(6, 8, 6, 8);
+        gbcProdotto.fill = GridBagConstraints.HORIZONTAL;
+
+        campoNomeProdotto = new JTextField(20);
+        campoDescrizioneProdotto = new JTextField(20);
+        campoPrezzoProdotto = new JTextField(20);
+        comboCategoriaProdotto = new JComboBox<>(new String[] {"Cibo", "Bevande"});
+
+        aggiungiCampo(panelProdotto, gbcProdotto, 0, "Nome:", campoNomeProdotto);
+        aggiungiCampo(panelProdotto, gbcProdotto, 1, "Descrizione:", campoDescrizioneProdotto);
+        aggiungiCampo(panelProdotto, gbcProdotto, 2, "Prezzo:", campoPrezzoProdotto);
+        aggiungiCampo(panelProdotto, gbcProdotto, 3, "Categoria:", comboCategoriaProdotto);
+
+        var btnCreaProdotto = creaBottone("Crea prodotto");
+        gbcProdotto.gridx = 0; gbcProdotto.gridy = 4; gbcProdotto.gridwidth = 2;
+        panelProdotto.add(btnCreaProdotto, gbcProdotto);
+        contenuto.add(panelProdotto);
+
+        panel.add(contenuto, BorderLayout.CENTER);
+
+        var footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footer.setOpaque(false);
+        var btnAggiorna = creaBottone("Aggiorna statistiche");
+        footer.add(btnAggiorna);
+        panel.add(footer, BorderLayout.SOUTH);
+
+        btnLogout.addActionListener(e -> controller.logout());
+        btnAggiorna.addActionListener(e -> controller.caricaAdmin());
+        btnCreaFattorino.addActionListener(e -> controller.registraFattorino(
+            campoNomeFattorino.getText(),
+            campoCognomeFattorino.getText(),
+            campoEmailFattorino.getText(),
+            new String(campoPasswordFattorino.getPassword())
+        ));
+        btnCreaProdotto.addActionListener(e -> controller.registraProdotto(
+            campoNomeProdotto.getText(),
+            campoDescrizioneProdotto.getText(),
+            campoPrezzoProdotto.getText(),
+            (String) comboCategoriaProdotto.getSelectedItem()
+        ));
+
+        return panel;
+    }
+
+    private void aggiungiCampo(JPanel panel, GridBagConstraints gbc,
+                               int riga, String etichetta, JComponent campo) {
+        gbc.gridx = 0; gbc.gridy = riga; gbc.gridwidth = 1;
+        panel.add(new JLabel(etichetta), gbc);
+        gbc.gridx = 1;
+        panel.add(campo, gbc);
+    }
+
+    private void filtraProdotti() {
+        modelProdotti.clear();
+        prodottiDisponibili.stream()
+            .filter(prodotto -> "BEVANDE".equals(filtroProdotti)
+                ? isBevanda(prodotto)
+                : !isBevanda(prodotto))
+            .forEach(modelProdotti::addElement);
+    }
+
+    private boolean isBevanda(Prodotto prodotto) {
+        var categoria = prodotto.nomeCategoria.toLowerCase();
+        var nome = prodotto.nome.toLowerCase();
+        return categoria.contains("bev")
+            || categoria.contains("drink")
+            || nome.contains("acqua")
+            || nome.contains("coca")
+            || nome.contains("fanta")
+            || nome.contains("sprite")
+            || nome.contains("birra")
+            || nome.contains("te ");
     }
 
     // Helper per creare bottoni stilizzati

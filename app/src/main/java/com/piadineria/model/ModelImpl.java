@@ -23,14 +23,31 @@ public final class ModelImpl implements Model {
     }
 
     @Override
+    public Optional<Fattorino> loginFattorino(String email, String password) {
+        return Fattorino.DAO.login(connection, email, password);
+    }
+
+    @Override
     public int registraUtente(String nome, String cognome,
                                String email, String password) {
         return Utente.DAO.registra(connection, nome, cognome, email, password);
     }
 
     @Override
+    public int registraFattorino(String nome, String cognome,
+                                 String email, String password) {
+        return Fattorino.DAO.registra(connection, nome, cognome, email, password);
+    }
+
+    @Override
     public List<Prodotto> getProdottiDisponibili() {
         return Prodotto.DAO.listDisponibili(connection);
+    }
+
+    @Override
+    public int registraProdotto(String nome, String descrizione,
+                                double prezzo, String categoria) {
+        return Prodotto.DAO.registra(connection, nome, descrizione, prezzo, categoria);
     }
 
     @Override
