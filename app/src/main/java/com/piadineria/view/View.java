@@ -324,6 +324,7 @@ public final class View {
         modelProdotti = new DefaultListModel<>();
         listaProdotti  = new JList<>(modelProdotti);
         listaProdotti.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        listaProdotti.setCellRenderer(new ProdottoCellRenderer());
         var panelProdotti = new JPanel(new BorderLayout(5, 5));
         panelProdotti.setOpaque(false);
         var headerProdotti = new JPanel(new BorderLayout());
@@ -608,6 +609,47 @@ public final class View {
             || nome.contains("sprite")
             || nome.contains("birra")
             || nome.contains("te ");
+    }
+
+    private final class ProdottoCellRenderer extends JPanel
+            implements ListCellRenderer<Prodotto> {
+
+        private final JLabel titolo = new JLabel();
+        private final JLabel descrizione = new JLabel();
+
+        private ProdottoCellRenderer() {
+            setLayout(new BorderLayout(4, 2));
+            setBorder(new EmptyBorder(7, 8, 7, 8));
+            titolo.setFont(titolo.getFont().deriveFont(Font.BOLD, 13f));
+            descrizione.setFont(descrizione.getFont().deriveFont(Font.PLAIN, 12f));
+            add(titolo, BorderLayout.NORTH);
+            add(descrizione, BorderLayout.CENTER);
+        }
+
+        @Override
+        public Component getListCellRendererComponent(
+                JList<? extends Prodotto> list,
+                Prodotto prodotto,
+                int index,
+                boolean isSelected,
+                boolean cellHasFocus) {
+
+            titolo.setText(String.format("%s - %.2f euro  [%s]",
+                prodotto.nome, prodotto.prezzo, prodotto.nomeCategoria));
+            descrizione.setText(prodotto.descrizione);
+
+            if (isSelected) {
+                setBackground(list.getSelectionBackground());
+                titolo.setForeground(list.getSelectionForeground());
+                descrizione.setForeground(list.getSelectionForeground());
+            } else {
+                setBackground(list.getBackground());
+                titolo.setForeground(list.getForeground());
+                descrizione.setForeground(Color.DARK_GRAY);
+            }
+            setOpaque(true);
+            return this;
+        }
     }
 
     // Helper per creare bottoni stilizzati
