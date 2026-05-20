@@ -45,6 +45,11 @@ public final class ModelImpl implements Model {
     }
 
     @Override
+    public List<Servizio> getOrdiniDelivery() {
+        return Servizio.DAO.delivery(connection);
+    }
+
+    @Override
     public List<StatisticaProdotto> getStatistiche() {
         return StatisticaProdotto.DAO.lista(connection);
     }

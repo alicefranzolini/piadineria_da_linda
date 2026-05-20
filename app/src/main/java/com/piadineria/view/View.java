@@ -42,6 +42,8 @@ public final class View {
     private DefaultListModel<Servizio> modelStorico;
     private JList<StatisticaProdotto> listaStats;
     private DefaultListModel<StatisticaProdotto> modelStats;
+    private JList<Servizio> listaDelivery;
+    private DefaultListModel<Servizio> modelDelivery;
 
     public View() {
         frame = new JFrame("Piadineria Da Linda 🫓");
@@ -58,6 +60,7 @@ public final class View {
         cards.add(creaSchermatRegistrazione(), "REGISTRAZIONE");
         cards.add(creaSchermatHome(),        "HOME");
         cards.add(creaSchermatStatistiche(), "STATISTICHE");
+        cards.add(creaSchermatFattorino(),   "FATTORINO");
     }
 
     /** Collega il controller alla view (chiamato dopo la creazione). */
@@ -101,6 +104,15 @@ public final class View {
         modelStats.clear();
         stats.forEach(modelStats::addElement);
         cardLayout.show(cards, "STATISTICHE");
+    }
+
+    public void mostraFattorino(String nome) {
+        cardLayout.show(cards, "FATTORINO");
+    }
+
+    public void mostraOrdiniDelivery(List<Servizio> ordini) {
+        modelDelivery.clear();
+        ordini.forEach(modelDelivery::addElement);
     }
 
     public void mostraErrore(String messaggio) {
@@ -148,21 +160,46 @@ public final class View {
         gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
         panel.add(btnLogin, gbc);
 
+        var panelRuoli = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+        panelRuoli.setOpaque(false);
+        var ruoloUtente = new JRadioButton("Utente");
+        var ruoloFattorino = new JRadioButton("Fattorino");
+        var ruoloAdmin = new JRadioButton("Admin");
+        ruoloUtente.setSelected(true);
+        for (var radio : List.of(ruoloUtente, ruoloFattorino, ruoloAdmin)) {
+            radio.setOpaque(false);
+            radio.setForeground(COLORE_PRIMARIO);
+        }
+        var gruppoRuoli = new ButtonGroup();
+        gruppoRuoli.add(ruoloUtente);
+        gruppoRuoli.add(ruoloFattorino);
+        gruppoRuoli.add(ruoloAdmin);
+        panelRuoli.add(new JLabel("Accesso come:"));
+        panelRuoli.add(ruoloUtente);
+        panelRuoli.add(ruoloFattorino);
+        panelRuoli.add(ruoloAdmin);
+        gbc.gridy = 4;
+        panel.add(panelRuoli, gbc);
+
         // Link registrazione
         var btnRegistrati = new JButton("Non hai un account? Registrati");
         btnRegistrati.setBorderPainted(false);
         btnRegistrati.setContentAreaFilled(false);
         btnRegistrati.setForeground(COLORE_ACCENTO);
-        gbc.gridy = 4;
+        gbc.gridy = 5;
         panel.add(btnRegistrati, gbc);
 
         // Azioni
-        btnLogin.addActionListener(e ->
+        btnLogin.addActionListener(e -> {
+            var ruolo = "UTENTE";
+            if (ruoloFattorino.isSelected()) ruolo = "FATTORINO";
+            if (ruoloAdmin.isSelected()) ruolo = "ADMIN";
             controller.login(
                 campoEmail.getText(),
-                new String(campoPassword.getPassword())
-            )
-        );
+                new String(campoPassword.getPassword()),
+                ruolo
+            );
+        });
         btnRegistrati.addActionListener(e -> cardLayout.show(cards, "REGISTRAZIONE"));
 
         return panel;
@@ -333,7 +370,47 @@ public final class View {
 
         var btnTorna = creaBottone("← Torna alla home");
         panel.add(btnTorna, BorderLayout.SOUTH);
-        btnTorna.addActionListener(e -> cardLayout.show(cards, "HOME"));
+        btnTorna.addActionListener(e -> controller.tornaDaStatistiche());
+
+        return panel;
+    }
+
+    private JPanel creaSchermatFattorino() {
+        var panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBackground(COLORE_SECONDARIO);
+        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        var header = new JPanel(new BorderLayout());
+        header.setBackground(COLORE_PRIMARIO);
+        header.setBorder(new EmptyBorder(8, 12, 8, 12));
+
+        var titolo = new JLabel("Area fattorino");
+        titolo.setFont(new Font("Serif", Font.BOLD, 18));
+        titolo.setForeground(Color.WHITE);
+        header.add(titolo, BorderLayout.WEST);
+
+        var btnLogout = new JButton("Esci");
+        btnLogout.setForeground(COLORE_PRIMARIO);
+        header.add(btnLogout, BorderLayout.EAST);
+        panel.add(header, BorderLayout.NORTH);
+
+        modelDelivery = new DefaultListModel<>();
+        listaDelivery = new JList<>(modelDelivery);
+
+        var centro = new JPanel(new BorderLayout(5, 5));
+        centro.setOpaque(false);
+        centro.add(new JLabel("Ordini delivery"), BorderLayout.NORTH);
+        centro.add(new JScrollPane(listaDelivery), BorderLayout.CENTER);
+        panel.add(centro, BorderLayout.CENTER);
+
+        var azioni = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        azioni.setOpaque(false);
+        var btnAggiorna = creaBottone("Aggiorna");
+        azioni.add(btnAggiorna);
+        panel.add(azioni, BorderLayout.SOUTH);
+
+        btnLogout.addActionListener(e -> controller.logout());
+        btnAggiorna.addActionListener(e -> controller.caricaOrdiniDelivery());
 
         return panel;
     }

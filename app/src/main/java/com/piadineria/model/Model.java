@@ -46,6 +46,9 @@ public interface Model {
     /** Storico ordini dell'utente. */
     List<Servizio> getStoricoOrdini(int idUtente);
 
+    /** Ordini delivery visibili al fattorino. */
+    List<Servizio> getOrdiniDelivery();
+
     // ---------- Statistiche (amministratore) ----------
 
     /** Statistiche di vendita per prodotto. */

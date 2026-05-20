@@ -106,6 +106,17 @@ public final class Servizio {
                 WHERE  id_utente = ?
                 """;
 
+        private static final String DELIVERY_QUERY = """
+                SELECT s.id_servizio,
+                       'DELIVERY' AS tipo,
+                       s.totale_costo, s.sconto_applicato,
+                       ss.nome_stato, s.giorno_creazione, s.ora_creazione
+                FROM   SERVIZIO s
+                JOIN   STATO_SERVIZIO ss ON s.id_stato = ss.id_stato
+                JOIN   DELIVERY d ON s.id_servizio = d.id_servizio
+                ORDER BY s.giorno_creazione DESC, s.ora_creazione DESC
+                """;
+
         /**
          * Restituisce lo storico degli ordini di un utente.
          */
@@ -113,6 +124,29 @@ public final class Servizio {
             var lista = new ArrayList<Servizio>();
             try (
                 var stmt = DAOUtils.prepareStatement(connection, STORICO_QUERY, idUtente);
+                var rs   = stmt.executeQuery()
+            ) {
+                while (rs.next()) {
+                    lista.add(new Servizio(
+                        rs.getInt("id_servizio"),
+                        rs.getString("tipo"),
+                        rs.getDouble("totale_costo"),
+                        rs.getDouble("sconto_applicato"),
+                        rs.getString("nome_stato"),
+                        rs.getDate("giorno_creazione").toLocalDate(),
+                        rs.getTime("ora_creazione").toLocalTime()
+                    ));
+                }
+            } catch (SQLException e) {
+                throw new DAOException(e);
+            }
+            return lista;
+        }
+
+        public static List<Servizio> delivery(Connection connection) {
+            var lista = new ArrayList<Servizio>();
+            try (
+                var stmt = DAOUtils.prepareStatement(connection, DELIVERY_QUERY);
                 var rs   = stmt.executeQuery()
             ) {
                 while (rs.next()) {

@@ -23,6 +23,9 @@ public final class Controller {
     private final Model model;
     private final View  view;
 
+    private static final String ADMIN_EMAIL = "admin@linda.it";
+    private static final String ADMIN_PASSWORD = "admin";
+
     // Utente attualmente loggato (null se nessuno)
     private Utente utenteCorrente;
 
@@ -44,7 +47,19 @@ public final class Controller {
     // -------------------------------------------------------------------------
 
     /** Chiamato dalla View quando l'utente preme "Login". */
-    public void login(String email, String password) {
+    public void login(String email, String password, String ruolo) {
+        if ("ADMIN".equals(ruolo)) {
+            loginAdmin(email, password);
+            return;
+        }
+        if ("FATTORINO".equals(ruolo)) {
+            loginFattorino(email, password);
+            return;
+        }
+        loginUtente(email, password);
+    }
+
+    private void loginUtente(String email, String password) {
         if (email.isBlank() || password.isBlank()) {
             view.mostraErrore("Inserisci email e password.");
             return;
@@ -57,6 +72,28 @@ public final class Controller {
         utenteCorrente = risultato.get();
         view.mostraHome(utenteCorrente.nome + " " + utenteCorrente.cognome);
         caricaProdotti();
+        caricaStorico();
+    }
+
+    private void loginAdmin(String email, String password) {
+        if (!ADMIN_EMAIL.equalsIgnoreCase(email.trim()) || !ADMIN_PASSWORD.equals(password)) {
+            view.mostraErrore("Credenziali admin errate.");
+            return;
+        }
+        utenteCorrente = null;
+        carrello.clear();
+        caricaStatistiche();
+    }
+
+    private void loginFattorino(String email, String password) {
+        if (email.isBlank() || password.isBlank()) {
+            view.mostraErrore("Inserisci email e password del fattorino.");
+            return;
+        }
+        utenteCorrente = null;
+        carrello.clear();
+        view.mostraFattorino("Fattorino");
+        caricaOrdiniDelivery();
     }
 
     /** Chiamato dalla View quando l'utente preme "Registrati". */
@@ -161,6 +198,12 @@ public final class Controller {
         view.mostraStorico(storico);
     }
 
+    /** Carica gli ordini delivery per il fattorino. */
+    public void caricaOrdiniDelivery() {
+        var ordini = model.getOrdiniDelivery();
+        view.mostraOrdiniDelivery(ordini);
+    }
+
     // -------------------------------------------------------------------------
     // Statistiche (amministratore)
     // -------------------------------------------------------------------------
@@ -169,5 +212,14 @@ public final class Controller {
     public void caricaStatistiche() {
         var stats = model.getStatistiche();
         view.mostraStatistiche(stats);
+    }
+
+    /** Torna indietro dalla schermata statistiche in base al ruolo corrente. */
+    public void tornaDaStatistiche() {
+        if (utenteCorrente == null) {
+            logout();
+            return;
+        }
+        view.mostraHome(utenteCorrente.nome + " " + utenteCorrente.cognome);
     }
 }
