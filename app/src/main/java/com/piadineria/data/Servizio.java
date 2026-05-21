@@ -109,6 +109,7 @@ public final class Servizio {
         private static final String CREATE_FEEDBACK = """
                 CREATE TABLE IF NOT EXISTS FEEDBACK (
                     id_feedback INT NOT NULL AUTO_INCREMENT,
+                    categoria VARCHAR(64) NOT NULL DEFAULT 'prodotto',
                     voto INT NOT NULL,
                     commento VARCHAR(500),
                     id_servizio INT NOT NULL,
@@ -117,8 +118,8 @@ public final class Servizio {
                 """;
 
         private static final String INSERT_FEEDBACK = """
-                INSERT INTO FEEDBACK (voto, commento, id_servizio)
-                VALUES (?, ?, ?)
+                INSERT INTO FEEDBACK (categoria, voto, commento, id_servizio)
+                VALUES (?, ?, ?, ?)
                 """;
 
         // Collega un prodotto al servizio (tabella CONTIENE)
@@ -141,6 +142,24 @@ public final class Servizio {
                 WHERE  id_utente = ?
                 """;
 
+        private static final String CREATE_STORICO_SCONTO = """
+                CREATE TABLE IF NOT EXISTS STORICO_SCONTO_APP (
+                    id_sconto INT NOT NULL AUTO_INCREMENT,
+                    id_servizio INT NOT NULL,
+                    id_utente INT NOT NULL,
+                    percentuale DOUBLE NOT NULL,
+                    importo_scontato DOUBLE NOT NULL,
+                    data_sconto DATE NOT NULL,
+                    CONSTRAINT storico_sconto_app_pk PRIMARY KEY (id_sconto)
+                )
+                """;
+
+        private static final String INSERT_STORICO_SCONTO = """
+                INSERT INTO STORICO_SCONTO_APP
+                    (id_servizio, id_utente, percentuale, importo_scontato, data_sconto)
+                VALUES (?, ?, ?, ?, DATE(NOW()))
+                """;
+
         private static final String DELIVERY_QUERY = """
                 SELECT s.id_servizio,
                        'DELIVERY' AS tipo,
@@ -149,6 +168,19 @@ public final class Servizio {
                 FROM   SERVIZIO s
                 JOIN   STATO_SERVIZIO ss ON s.id_stato = ss.id_stato
                 JOIN   DELIVERY d ON s.id_servizio = d.id_servizio
+                WHERE  LOWER(ss.nome_stato) <> 'consegnato'
+                ORDER BY s.giorno_creazione DESC, s.ora_creazione DESC
+                """;
+
+        private static final String DELIVERY_CONSEGNATI_QUERY = """
+                SELECT s.id_servizio,
+                       'DELIVERY' AS tipo,
+                       s.totale_costo, s.sconto_applicato,
+                       ss.nome_stato, s.giorno_creazione, s.ora_creazione
+                FROM   SERVIZIO s
+                JOIN   STATO_SERVIZIO ss ON s.id_stato = ss.id_stato
+                JOIN   DELIVERY d ON s.id_servizio = d.id_servizio
+                WHERE  LOWER(ss.nome_stato) = 'consegnato'
                 ORDER BY s.giorno_creazione DESC, s.ora_creazione DESC
                 """;
 
@@ -166,6 +198,12 @@ public final class Servizio {
         private static final String UPDATE_STATO = """
                 UPDATE SERVIZIO
                 SET id_stato = ?
+                WHERE id_servizio = ?
+                """;
+
+        private static final String UPDATE_TOTALE_SERVIZIO = """
+                UPDATE SERVIZIO
+                SET totale_costo = ?
                 WHERE id_servizio = ?
                 """;
 
@@ -208,9 +246,17 @@ public final class Servizio {
         }
 
         public static List<Servizio> delivery(Connection connection) {
+            return queryServizi(connection, DELIVERY_QUERY);
+        }
+
+        public static List<Servizio> deliveryConsegnati(Connection connection) {
+            return queryServizi(connection, DELIVERY_CONSEGNATI_QUERY);
+        }
+
+        private static List<Servizio> queryServizi(Connection connection, String query) {
             var lista = new ArrayList<Servizio>();
             try (
-                var stmt = DAOUtils.prepareStatement(connection, DELIVERY_QUERY);
+                var stmt = DAOUtils.prepareStatement(connection, query);
                 var rs   = stmt.executeQuery()
             ) {
                 while (rs.next()) {
@@ -267,6 +313,7 @@ public final class Servizio {
                                      String indirizzoConsegna,
                                      Map<Integer, Integer> prodotti) {
             try {
+                TesseraFedelta.DAO.trovaOCrea(connection, idUtente);
                 // Calcola il totale sommando prezzi dei prodotti
                 double totale = calcolaTotale(connection, prodotti);
                 double sconto = calcolaSconto(connection, idUtente, totale);
@@ -308,6 +355,10 @@ public final class Servizio {
                         connection, UPDATE_TESSERA, idUtente)) {
                     s.executeUpdate();
                 }
+                if (sconto > 0) {
+                    registraStoricoSconto(connection, idServizio, idUtente, sconto,
+                        totale - totaleScontato);
+                }
 
                 return idServizio;
 
@@ -339,14 +390,37 @@ public final class Servizio {
             }
         }
 
+        public static void aggiungiProdottiServizio(Connection connection,
+                                                   int idServizio,
+                                                   Map<Integer, Integer> prodotti) {
+            try {
+                double totale = calcolaTotale(connection, prodotti);
+                for (var entry : prodotti.entrySet()) {
+                    try (var s = DAOUtils.prepareStatement(
+                            connection, INSERT_CONTIENE,
+                            idServizio, entry.getKey(), entry.getValue())) {
+                        s.executeUpdate();
+                    }
+                }
+                try (var s = DAOUtils.prepareStatement(
+                        connection, UPDATE_TOTALE_SERVIZIO, totale, idServizio)) {
+                    s.executeUpdate();
+                }
+                Magazzino.DAO.decrementa(connection, prodotti);
+            } catch (SQLException e) {
+                throw new DAOException(e);
+            }
+        }
+
         public static void lasciaFeedback(Connection connection,
                                           int idServizio,
+                                          String categoria,
                                           int voto,
                                           String commento) {
             try {
                 preparaFeedback(connection);
                 try (var s = DAOUtils.prepareStatement(
-                        connection, INSERT_FEEDBACK, voto, commento, idServizio)) {
+                        connection, INSERT_FEEDBACK, categoria, voto, commento, idServizio)) {
                     s.executeUpdate();
                 }
             } catch (SQLException e) {
@@ -393,6 +467,7 @@ public final class Servizio {
         // Controlla se spetta lo sconto fedeltà (ogni 5 ordini il 6° è scontato 20%)
         private static double calcolaSconto(Connection connection,
                                             int idUtente, double totale) throws SQLException {
+            TesseraFedelta.DAO.prepara(connection);
             String query = """
                     SELECT ordini_effettuati FROM TESSERA_FEDELTA WHERE id_utente = ?
                     """;
@@ -405,6 +480,20 @@ public final class Servizio {
                 }
             }
             return 0.0;
+        }
+
+        private static void registraStoricoSconto(Connection connection, int idServizio,
+                                                  int idUtente, double percentuale,
+                                                  double importo)
+                throws SQLException {
+            try (var stmt = connection.createStatement()) {
+                stmt.executeUpdate(CREATE_STORICO_SCONTO);
+            }
+            try (var stmt = DAOUtils.prepareStatement(
+                    connection, INSERT_STORICO_SCONTO,
+                    idServizio, idUtente, percentuale, importo)) {
+                stmt.executeUpdate();
+            }
         }
 
         private static int creaServizioBase(Connection connection, int idUtente,
@@ -475,6 +564,8 @@ public final class Servizio {
             try (var stmt = connection.createStatement()) {
                 stmt.executeUpdate(CREATE_FEEDBACK);
             }
+            aggiungiColonnaSeManca(connection, "FEEDBACK",
+                "categoria", "VARCHAR(64) NOT NULL DEFAULT 'prodotto'");
             aggiungiColonnaSeManca(connection, "FEEDBACK",
                 "voto", "INT NOT NULL DEFAULT 5");
             aggiungiColonnaSeManca(connection, "FEEDBACK",

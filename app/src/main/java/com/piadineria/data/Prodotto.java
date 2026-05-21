@@ -83,6 +83,12 @@ public final class Prodotto {
                 VALUES (?, ?, ?, FALSE, ?)
                 """;
 
+        private static final String DISABLE_PRODUCT = """
+                UPDATE PRODOTTO
+                SET disponibilita = FALSE
+                WHERE id_prodotto = ?
+                """;
+
         /**
          * Restituisce la lista di tutti i prodotti disponibili.
          * Usato nella schermata principale per mostrare il menù.
@@ -138,11 +144,12 @@ public final class Prodotto {
         }
 
         public static Prodotto creaComponibile(Connection connection,
+                                               String nomeVisualizzato,
                                                String descrizione,
                                                double prezzo) {
             try {
                 int idCategoria = getOrCreateCategoria(connection, "Cibo");
-                String nomeDb = "Piadina componibile personalizzata " + System.nanoTime();
+                String nomeDb = nomeVisualizzato + " " + System.nanoTime();
                 var stmt = connection.prepareStatement(
                     INSERT_CUSTOM_PRODUCT, java.sql.Statement.RETURN_GENERATED_KEYS);
                 stmt.setString(1, nomeDb);
@@ -153,7 +160,15 @@ public final class Prodotto {
 
                 var keys = stmt.getGeneratedKeys();
                 if (!keys.next()) throw new DAOException("Creazione piadina componibile fallita");
-                return new Prodotto(keys.getInt(1), "Piadina componibile", descrizione, prezzo, "Cibo", true);
+                return new Prodotto(keys.getInt(1), nomeVisualizzato, descrizione, prezzo, "Cibo", true);
+            } catch (SQLException e) {
+                throw new DAOException(e);
+            }
+        }
+
+        public static void rimuoviDalMenu(Connection connection, int idProdotto) {
+            try (var stmt = DAOUtils.prepareStatement(connection, DISABLE_PRODUCT, idProdotto)) {
+                stmt.executeUpdate();
             } catch (SQLException e) {
                 throw new DAOException(e);
             }

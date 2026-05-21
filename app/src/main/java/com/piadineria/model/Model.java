@@ -51,8 +51,11 @@ public interface Model {
     int registraProdotto(String nome, String descrizione,
                          double prezzo, String categoria);
 
+    /** Rimuove un prodotto dalla lista visibile del menu. */
+    void rimuoviProdottoDalMenu(int idProdotto);
+
     /** Crea una piadina componibile con prezzo calcolato. */
-    Prodotto creaPiadinaComponibile(String descrizione, double prezzo);
+    Prodotto creaPiadinaComponibile(String nomeVisualizzato, String descrizione, double prezzo);
 
     // ---------- Ordini ----------
 
@@ -70,8 +73,11 @@ public interface Model {
     /** Crea una prenotazione tavolo. */
     int prenotaTavolo(int idUtente, LocalDate giorno, LocalTime ora, int persone);
 
+    /** Collega prodotti gia scelti a un servizio esistente, per esempio un preordine. */
+    void aggiungiProdottiServizio(int idServizio, Map<Integer, Integer> prodotti);
+
     /** Registra il feedback su un servizio. */
-    void lasciaFeedback(int idServizio, int voto, String commento);
+    void lasciaFeedback(int idServizio, String categoria, int voto, String commento);
 
     /** Lista feedback per admin. */
     List<DettaglioFeedback> getFeedback();
@@ -80,7 +86,13 @@ public interface Model {
     List<Magazzino> getMagazzino();
 
     /** Aggiorna manualmente la quantita in magazzino. */
-    void aggiornaMagazzino(int idProdotto, int quantita);
+    void aggiornaMagazzino(int idMagazzino, int quantita);
+
+    List<IndirizzoConsegna> getIndirizziConsegna(int idUtente);
+
+    void salvaIndirizzoConsegna(int idUtente, String nome, String indirizzo);
+
+    void aggiungiIngredienteMagazzino(String nome, int quantita, int soglia, String fornitore);
 
     /** Storico ordini dell'utente. */
     List<Servizio> getStoricoOrdini(int idUtente);
@@ -90,6 +102,8 @@ public interface Model {
 
     /** Ordini delivery visibili al fattorino. */
     List<Servizio> getOrdiniDelivery();
+
+    List<Servizio> getOrdiniDeliveryConsegnati();
 
     /** Aggiorna lo stato di un ordine delivery. */
     void aggiornaStatoOrdine(int idServizio, String nomeStato);

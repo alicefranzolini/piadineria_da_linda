@@ -68,8 +68,13 @@ public final class ModelImpl implements Model {
     }
 
     @Override
-    public Prodotto creaPiadinaComponibile(String descrizione, double prezzo) {
-        return Prodotto.DAO.creaComponibile(connection, descrizione, prezzo);
+    public void rimuoviProdottoDalMenu(int idProdotto) {
+        Prodotto.DAO.rimuoviDalMenu(connection, idProdotto);
+    }
+
+    @Override
+    public Prodotto creaPiadinaComponibile(String nomeVisualizzato, String descrizione, double prezzo) {
+        return Prodotto.DAO.creaComponibile(connection, nomeVisualizzato, descrizione, prezzo);
     }
 
     @Override
@@ -85,8 +90,13 @@ public final class ModelImpl implements Model {
     }
 
     @Override
-    public void lasciaFeedback(int idServizio, int voto, String commento) {
-        Servizio.DAO.lasciaFeedback(connection, idServizio, voto, commento);
+    public void aggiungiProdottiServizio(int idServizio, Map<Integer, Integer> prodotti) {
+        Servizio.DAO.aggiungiProdottiServizio(connection, idServizio, prodotti);
+    }
+
+    @Override
+    public void lasciaFeedback(int idServizio, String categoria, int voto, String commento) {
+        Servizio.DAO.lasciaFeedback(connection, idServizio, categoria, voto, commento);
     }
 
     @Override
@@ -100,8 +110,23 @@ public final class ModelImpl implements Model {
     }
 
     @Override
-    public void aggiornaMagazzino(int idProdotto, int quantita) {
-        Magazzino.DAO.aggiorna(connection, idProdotto, quantita);
+    public void aggiornaMagazzino(int idMagazzino, int quantita) {
+        Magazzino.DAO.aggiorna(connection, idMagazzino, quantita);
+    }
+
+    @Override
+    public List<IndirizzoConsegna> getIndirizziConsegna(int idUtente) {
+        return IndirizzoConsegna.DAO.lista(connection, idUtente);
+    }
+
+    @Override
+    public void salvaIndirizzoConsegna(int idUtente, String nome, String indirizzo) {
+        IndirizzoConsegna.DAO.salva(connection, idUtente, nome, indirizzo);
+    }
+
+    @Override
+    public void aggiungiIngredienteMagazzino(String nome, int quantita, int soglia, String fornitore) {
+        Magazzino.DAO.aggiungi(connection, nome, quantita, soglia, fornitore);
     }
 
     @Override
@@ -117,6 +142,11 @@ public final class ModelImpl implements Model {
     @Override
     public List<Servizio> getOrdiniDelivery() {
         return Servizio.DAO.delivery(connection);
+    }
+
+    @Override
+    public List<Servizio> getOrdiniDeliveryConsegnati() {
+        return Servizio.DAO.deliveryConsegnati(connection);
     }
 
     @Override

@@ -10,22 +10,24 @@ public final class DettaglioFeedback {
     public final int idServizio;
     public final String cliente;
     public final String tipo;
+    public final String categoria;
     public final int voto;
     public final String commento;
 
     public DettaglioFeedback(int idServizio, String cliente,
-                             String tipo, int voto, String commento) {
+                             String tipo, String categoria, int voto, String commento) {
         this.idServizio = idServizio;
         this.cliente = cliente;
         this.tipo = tipo;
+        this.categoria = categoria;
         this.voto = voto;
         this.commento = commento;
     }
 
     @Override
     public String toString() {
-        return String.format("#%d [%s] %s - voto %d/5 - %s",
-            idServizio, tipo, cliente, voto, commento == null ? "" : commento);
+        return String.format("#%d [%s/%s] %s - voto %d/5 - %s",
+            idServizio, tipo, categoria, cliente, voto, commento == null ? "" : commento);
     }
 
     public static final class DAO {
@@ -38,6 +40,7 @@ public final class DettaglioFeedback {
                            WHEN pt.id_prenotazione IS NOT NULL THEN 'PRENOTAZIONE'
                            ELSE 'SERVIZIO'
                        END AS tipo,
+                       COALESCE(f.categoria, 'prodotto') AS categoria,
                        f.voto, f.commento
                 FROM FEEDBACK f
                 JOIN SERVIZIO s ON f.id_servizio = s.id_servizio
@@ -60,6 +63,7 @@ public final class DettaglioFeedback {
                         rs.getInt("id_servizio"),
                         rs.getString("cliente"),
                         rs.getString("tipo"),
+                        rs.getString("categoria"),
                         rs.getInt("voto"),
                         rs.getString("commento")
                     ));

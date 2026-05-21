@@ -43,12 +43,6 @@ public final class Utente {
                 VALUES (?, ?, ?, ?)
                 """;
 
-        private static final String TESSERA_QUERY = """
-                INSERT INTO TESSERA_FEDELTA
-                    (numero_tessera, ordini_effettuati, id_utente)
-                VALUES (CONCAT('TF', LPAD(?, 6, '0')), 0, ?)
-                """;
-
         /**
          * Tenta il login. Restituisce Optional.empty() se le credenziali
          * non corrispondono, altrimenti l'utente trovato.
@@ -97,10 +91,7 @@ public final class Utente {
                 int nuovoId = keys.getInt(1);
 
                 // Passo 2: crea tessera fedeltà collegata
-                try (var stmtT = DAOUtils.prepareStatement(
-                        connection, TESSERA_QUERY, nuovoId, nuovoId)) {
-                    stmtT.executeUpdate();
-                }
+                TesseraFedelta.DAO.trovaOCrea(connection, nuovoId);
 
                 return nuovoId;
             } catch (SQLException e) {

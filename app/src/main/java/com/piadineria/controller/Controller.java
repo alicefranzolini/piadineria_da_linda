@@ -171,10 +171,36 @@ public final class Controller {
             model.registraProdotto(nome, descrizione, prezzo, categoria);
             view.mostraMessaggio("Prodotto aggiunto al menu.");
             view.pulisciFormProdotto();
+            caricaProdotti();
+            view.mostraProdottiMenuAdmin(model.getProdottiDisponibili());
         } catch (NumberFormatException e) {
             view.mostraErrore("Inserisci un prezzo valido, per esempio 6.50.");
         } catch (DAOException e) {
             view.mostraErrore("Prodotto gia presente o errore nel database.");
+        }
+    }
+
+    public void rimuoviProdottoDalMenu(Prodotto prodotto) {
+        if (prodotto == null) {
+            view.mostraErrore("Seleziona un prodotto dal menu.");
+            return;
+        }
+        try {
+            model.rimuoviProdottoDalMenu(prodotto.id);
+            view.mostraMessaggio("Prodotto rimosso dal menu.");
+            caricaProdotti();
+            view.mostraProdottiMenuAdmin(model.getProdottiDisponibili());
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante la rimozione del prodotto: " + dettaglioErrore(e));
+        }
+    }
+
+    public void caricaMenuAdmin() {
+        try {
+            view.mostraProdottiMenuAdmin(model.getProdottiDisponibili());
+            view.mostraIngredientiSelezionabili(model.getMagazzino());
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante il caricamento del menu: " + dettaglioErrore(e));
         }
     }
 
@@ -212,12 +238,18 @@ public final class Controller {
     /** Crea e aggiunge al carrello una piadina componibile. */
     public void aggiungiPiadinaComponibile(List<String> ingredienti,
                                            double prezzo) {
+        aggiungiPiadinaPersonalizzata("Piadina componibile", ingredienti, prezzo);
+    }
+
+    public void aggiungiPiadinaPersonalizzata(String nomeVisualizzato,
+                                              List<String> ingredienti,
+                                              double prezzo) {
         if (ingredienti.isEmpty()) {
             view.mostraErrore("Seleziona almeno un ingrediente.");
             return;
         }
         var descrizione = "Ingredienti: " + String.join(", ", ingredienti);
-        var prodotto = model.creaPiadinaComponibile(descrizione, prezzo);
+        var prodotto = model.creaPiadinaComponibile(nomeVisualizzato, descrizione, prezzo);
         aggiungiAlCarrello(prodotto);
         caricaProdotti();
     }
@@ -274,6 +306,18 @@ public final class Controller {
         }
     }
 
+    public List<IndirizzoConsegna> getIndirizziCorrenti() {
+        if (utenteCorrente == null) return List.of();
+        return model.getIndirizziConsegna(utenteCorrente.id);
+    }
+
+    public void salvaIndirizzoCorrente(String nome, String indirizzo) {
+        if (utenteCorrente == null) return;
+        if (!nome.isBlank() && !indirizzo.isBlank()) {
+            model.salvaIndirizzoConsegna(utenteCorrente.id, nome.trim(), indirizzo.trim());
+        }
+    }
+
     /**
      * Conferma l'ordine come ASPORTO.
      * Chiamato dalla View quando l'utente preme "Ordina da asporto".
@@ -297,6 +341,11 @@ public final class Controller {
 
     /** Prenota un tavolo per l'utente corrente. */
     public void prenotaTavolo(String giornoTesto, String oraTesto, String personeTesto) {
+        prenotaTavolo(giornoTesto, oraTesto, personeTesto, false);
+    }
+
+    public void prenotaTavolo(String giornoTesto, String oraTesto, String personeTesto,
+                              boolean conPreordine) {
         if (utenteCorrente == null) {
             view.mostraErrore("Non sei loggato.");
             return;
@@ -312,6 +361,13 @@ public final class Controller {
             }
 
             int id = model.prenotaTavolo(utenteCorrente.id, giorno, ora, persone);
+            if (conPreordine && !carrello.isEmpty()) {
+                model.aggiungiProdottiServizio(id, carrello);
+                carrello.clear();
+                prodottiCarrello.clear();
+                view.aggiornaCarrello(0);
+                view.mostraCarrello(carrello, prodottiCarrello);
+            }
             view.mostraMessaggio("Prenotazione tavolo #" + id + " inviata. Stato: in attesa.");
             caricaStorico();
         } catch (DateTimeParseException e) {
@@ -324,7 +380,7 @@ public final class Controller {
     }
 
     /** Lascia un feedback sull'ordine selezionato nello storico. */
-    public void lasciaFeedback(Servizio servizio, int voto, String commento) {
+    public void lasciaFeedback(Servizio servizio, String categoria, int voto, String commento) {
         if (utenteCorrente == null) {
             view.mostraErrore("Non sei loggato.");
             return;
@@ -339,7 +395,7 @@ public final class Controller {
         }
 
         try {
-            model.lasciaFeedback(servizio.id, voto, commento);
+            model.lasciaFeedback(servizio.id, categoria, voto, commento);
             view.mostraMessaggio("Feedback salvato. Grazie!");
         } catch (DAOException e) {
             view.mostraErrore("Errore durante il salvataggio del feedback: " + dettaglioErrore(e));
@@ -355,6 +411,11 @@ public final class Controller {
         if (utenteCorrente == null) return;
         var storico = model.getStoricoOrdini(utenteCorrente.id);
         view.mostraStorico(storico);
+    }
+
+    public void mostraStoricoOrdini() {
+        caricaStorico();
+        view.mostraStoricoOrdiniPopup();
     }
 
     /** Mostra la tessera fedelta dell'utente corrente. */
@@ -375,6 +436,7 @@ public final class Controller {
     public void caricaOrdiniDelivery() {
         var ordini = model.getOrdiniDelivery();
         view.mostraOrdiniDelivery(ordini);
+        view.mostraOrdiniDeliveryConsegnati(model.getOrdiniDeliveryConsegnati());
     }
 
     /** Aggiorna lo stato dell'ordine selezionato dal fattorino. */
@@ -412,6 +474,19 @@ public final class Controller {
             view.mostraDettaglioOrdine(model.getDettaglioOrdine(ordine.id));
         } catch (DAOException e) {
             view.mostraErrore("Errore durante il caricamento dei dettagli: " + dettaglioErrore(e));
+        }
+    }
+
+    public void mostraPreordineTavolo(Servizio prenotazione) {
+        if (prenotazione == null) {
+            view.mostraErrore("Seleziona una prenotazione tavolo.");
+            return;
+        }
+
+        try {
+            view.mostraDettaglioOrdine(model.getDettaglioOrdine(prenotazione.id));
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante il caricamento del preordine: " + dettaglioErrore(e));
         }
     }
 
@@ -510,12 +585,30 @@ public final class Controller {
                 view.mostraErrore("La quantita non puo essere negativa.");
                 return;
             }
-            model.aggiornaMagazzino(riga.idProdotto, quantita);
+            model.aggiornaMagazzino(riga.id, quantita);
             caricaMagazzino();
         } catch (NumberFormatException e) {
             view.mostraErrore("Inserisci una quantita valida.");
         } catch (DAOException e) {
             view.mostraErrore("Errore durante l'aggiornamento del magazzino: " + dettaglioErrore(e));
+        }
+    }
+
+    public void aggiungiIngredienteMagazzino(String nome, String quantitaTesto,
+                                             String sogliaTesto, String fornitore) {
+        if (nome.isBlank() || quantitaTesto.isBlank() || sogliaTesto.isBlank() || fornitore.isBlank()) {
+            view.mostraErrore("Compila tutti i campi dell'ingrediente.");
+            return;
+        }
+        try {
+            int quantita = Integer.parseInt(quantitaTesto.trim());
+            int soglia = Integer.parseInt(sogliaTesto.trim());
+            model.aggiungiIngredienteMagazzino(nome.trim(), quantita, soglia, fornitore.trim());
+            caricaMagazzino();
+        } catch (NumberFormatException e) {
+            view.mostraErrore("Quantita e soglia devono essere numeri validi.");
+        } catch (DAOException e) {
+            view.mostraErrore("Errore durante l'aggiunta ingrediente: " + dettaglioErrore(e));
         }
     }
 

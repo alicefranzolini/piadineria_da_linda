@@ -39,10 +39,10 @@ public final class DettaglioOrdine {
 
         private static final String TESTATA_QUERY = """
                 SELECT CONCAT(u.nome, ' ', u.cognome) AS cliente,
-                       d.indirizzo_consegna
+                       COALESCE(d.indirizzo_consegna, 'Servizio al tavolo / asporto') AS indirizzo
                 FROM   SERVIZIO s
                 JOIN   UTENTE u ON s.id_utente = u.id_utente
-                JOIN   DELIVERY d ON s.id_servizio = d.id_servizio
+                LEFT JOIN DELIVERY d ON s.id_servizio = d.id_servizio
                 WHERE  s.id_servizio = ?
                 """;
 
@@ -62,9 +62,9 @@ public final class DettaglioOrdine {
                     var stmt = DAOUtils.prepareStatement(connection, TESTATA_QUERY, idServizio);
                     var rs = stmt.executeQuery()
                 ) {
-                    if (!rs.next()) throw new DAOException("Ordine delivery non trovato");
+                    if (!rs.next()) throw new DAOException("Servizio non trovato");
                     cliente = rs.getString("cliente");
-                    indirizzo = rs.getString("indirizzo_consegna");
+                    indirizzo = rs.getString("indirizzo");
                 }
 
                 var prodotti = new ArrayList<String>();
@@ -76,6 +76,7 @@ public final class DettaglioOrdine {
                         prodotti.add(rs.getInt("quantita") + "x " + rs.getString("nome"));
                     }
                 }
+                if (prodotti.isEmpty()) prodotti.add("Nessun preordine associato");
 
                 return new DettaglioOrdine(idServizio, cliente, indirizzo, prodotti);
             } catch (SQLException e) {
